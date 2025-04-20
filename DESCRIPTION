@@ -1,0 +1,20 @@
+Package: SurvNPSA
+Type: Package
+Title: Nonparametric Causal Sensitivity Analysis for Survival Outcomes
+Version: 0.0.1
+Authors@R: 
+    person("Rui", "Hu", email = "ruihu.cufe@outlook.com", role = c("aut", "cre"))
+Description: 
+    SurvNPSA implements a nonparametric causal sensitivity analysis framework for time-to-event data, 
+    providing nonparametric bounds and valid inference for survival contrasts, 
+    including differences in survival curves and restricted mean survival times (RMST), 
+    along with summary metrics to assess the extent of unobserved confounding required to explain away observed causal effects.
+License: MIT
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports:
+    survival,
+    dplyr,
+    ggplot2
