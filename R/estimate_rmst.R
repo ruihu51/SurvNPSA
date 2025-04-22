@@ -1,7 +1,10 @@
 library(cubature)
 
+#' Estimate observed components
+#'
+#' @keywords internal
 .get.rmst.obs.comps <- function(time, event, result,
-                                fit.times.rmst, max_gap=0.1,
+                                fit.times.rmst, eval.times.rmst, max_gap=0.1,
                                 tol=0.001, tol1=0.001, tol2=0.001,
                                 gamma.type="hybrid", verbose=TRUE){
 
@@ -10,8 +13,7 @@ library(cubature)
         fit.times.rmst <- fit.times.rmst[fit.times.rmst <= max(result$fit.times)]
     }
 
-    eval.times.rmst <- result$fit.times
-
+    cat("1", "\n")
     gap <- max(diff(sort(eval.times.rmst[eval.times.rmst >= min(eval.times.rmst) & eval.times.rmst <= max(fit.times.rmst)])))
     if (gap > max_gap) {
         stop(sprintf(
@@ -25,10 +27,10 @@ library(cubature)
     }
 
     if(verbose) message("Estimating RMST differences...")
-    result$rmst.obs <- sapply(fit.times.rmst, .get.obs.rmst.int.vals, result$obs.comps.df$theta.obs, tol = tol)
+    result$rmst.obs <- sapply(fit.times.rmst, .get.obs.rmst.int.vals, result$obs.comps.df$theta.obs, tol = tol, eval.times.rmst=eval.times.rmst)
 
     result$IF.vals.rmst.obs <- t(apply(result$IF.vals.theta.obs, 1, function(row) {
-        sapply(fit.times.rmst, function(t) .get.obs.rmst.int.vals(t, row, tol = tol))
+        sapply(fit.times.rmst, function(t) .get.obs.rmst.int.vals(t, row, tol = tol, eval.times.rmst=eval.times.rmst))
     }))
 
     if(verbose) message("Estimating E[(min(T,t)-S(t|A,W))^2]...")
@@ -41,11 +43,11 @@ library(cubature)
     )
 
     if(verbose) message("Estimating E[(min(T,t)-S(t|A,W))^2] part 1...")
-    gamma.p1 <- sapply(fit.times.rmst, .get.gamma.p1.int.vals, gamma.rst$gamma.p1.est, tol = tol1)
-    gamma.p1.plug.in <- sapply(fit.times.rmst, .get.gamma.p1.int.vals, gamma.rst$gamma.p1.est.plug.in, tol = tol1)
+    gamma.p1 <- sapply(fit.times.rmst, .get.gamma.p1.int.vals, gamma.rst$gamma.p1.est, tol = tol1, eval.times.rmst=eval.times.rmst)
+    gamma.p1.plug.in <- sapply(fit.times.rmst, .get.gamma.p1.int.vals, gamma.rst$gamma.p1.est.plug.in, tol = tol1, eval.times.rmst=eval.times.rmst)
 
     IF.vals.gamma.p1.int <- t(apply(gamma.rst$IF.vals.gamma.p1, 1, function(row) {
-        sapply(fit.times.rmst, function(t) .get.gamma.p1.int.vals(t, row, tol = tol1))
+        sapply(fit.times.rmst, function(t) .get.gamma.p1.int.vals(t, row, tol = tol1, eval.times.rmst=eval.times.rmst))
     }))
 
     if(verbose) message("Estimating E[(min(T,t)-S(t|A,W))^2] part 2...")
@@ -77,7 +79,7 @@ library(cubature)
 }
 
 
-.get.obs.rmst.int.vals <- function(t, theta.obs, tol){
+.get.obs.rmst.int.vals <- function(t, theta.obs, tol, eval.times.rmst){
     # step function
     theta.obs.func <- stepfun(c(0, eval.times.rmst[-length(eval.times.rmst)]),
                               c(0, theta.obs), right = FALSE)
@@ -159,7 +161,7 @@ library(cubature)
 }
 
 
-.get.gamma.p1.int.vals <- function(t, gamma.p1.est, tol){
+.get.gamma.p1.int.vals <- function(t, gamma.p1.est, tol, eval.times.rmst){
     # step function
     gamma.p1.func <- function(u){
         step_fun <- stepfun(c(0, eval.times.rmst[-length(eval.times.rmst)]),

@@ -1,3 +1,6 @@
+#' Estimate observed components
+#'
+#' @keywords internal
 .simulate.senspar <- function(time, event, treat, confounders,
                               fit.times,
                               psi, tau, S.hat.obs,
@@ -82,6 +85,7 @@
 
       V.g.matrix.psi <- colMeans((S.hat.obs - S.hat.obs.drop)^2)
       V.a.vector <- tau - result.sim.drop$tau
+      cat(V.a.vector, "\n")
 
       Gain.out.matrix = pmax(0, V.g.matrix.psi[eval.idx] / psi[fit.idx]) # 1*t
       Gain.trt.vector = pmax(0, V.a.vector / tau) # 1*1
@@ -99,10 +103,10 @@
       if (rmst){
 
         h.hat.obs <- t(apply(S.hat.obs, 1, function(row) {
-          sapply(fit.times.rmst, function(t) .get.S.hat.int.vals(t, row, tol = tol))
+          sapply(fit.times.rmst, function(t) .get.S.hat.int.vals(t, row, tol = tol, result.sim.drop = result.sim.drop))
         }))
         h.hat.obs.drop <- t(apply(S.hat.obs.drop, 1, function(row) {
-          sapply(fit.times.rmst, function(t) .get.S.hat.int.vals(t, row, tol = tol))
+          sapply(fit.times.rmst, function(t) .get.S.hat.int.vals(t, row, tol = tol, result.sim.drop= result.sim.drop))
         }))
 
         V.h.matrix.gamma <- colMeans((h.hat.obs - h.hat.obs.drop)^2)
@@ -146,7 +150,7 @@
 
 }
 
-.get.S.hat.int.vals <- function(t, S.hat.obs, tol){
+.get.S.hat.int.vals <- function(t, S.hat.obs, tol, result.sim.drop){
   # step function
   theta.obs.func <- stepfun(c(0, result.sim.drop$nuisance$eval.times[-length(result.sim.drop$nuisance$eval.times)]),
                             c(1, S.hat.obs), right = FALSE)
@@ -154,3 +158,4 @@
   hcubature(theta.obs.func, lowerLimit = c(0),
             upperLimit = c(t), tol=tol)$integral
 }
+

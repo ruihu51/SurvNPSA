@@ -1,5 +1,4 @@
-.get.nuisances.est <- function(time, event, treat, confounders,
-                               fit.times=sort(unique(time[time > 0 & time < max(time[event == 1])])),
+.get.nuisances.est <- function(time, event, treat, confounders, fit.times,
                                fit.treat=c(0,1), nuisance.options = list(),
                                verbose=TRUE){
     .args <- mget(names(formals()), sys.frame(sys.nframe()))
@@ -62,6 +61,7 @@
     }
 
     if(is.null(nuis$eval.times)) nuis$eval.times <- sort(unique(c(0,time[time > 0 & time <= max(fit.times)], max(fit.times))))
+    # if(is.null(nuis$eval.times)) nuis$eval.times <- seq(0,24,by=0.5)
     # if(is.null(nuis$eval.times)) nuis$eval.times <- fit.times
     k <- length(nuis$eval.times)
 
@@ -172,8 +172,8 @@ CFsurvival.nuisance.options <- function(cross.fit = TRUE, V = ifelse(cross.fit, 
                                         event.pred.0 = NULL, event.pred.1 = NULL, event.pred = NULL,
                                         cens.SL.library = lapply(c("survSL.km", "survSL.coxph", "survSL.expreg", "survSL.weibreg", "survSL.loglogreg", "survSL.rfsrc"), function(alg) c(alg, "All")),
                                         cens.trunc=0, cens.pred.0 = NULL, cens.pred.1 = NULL, cens.pred = NULL,
-                                        survSL.control = list(initWeightAlg = "survSL.rfsrc", verbose=FALSE), survSL.cvControl = list(V = 10), save.nuis.fits = FALSE,
-                                        prop.SL.library = lapply(c("SL.mean", "SL.glm", "SL.earth", "SL.ranger", "SL.xgboost"), function(alg) c(alg, "All")), prop.trunc=0, prop.pred = NULL,
+                                        survSL.control = list(initWeightAlg = "survSL.rfsrc", verbose=FALSE), survSL.cvControl = list(V = 5), save.nuis.fits = FALSE,
+                                        prop.SL.library = lapply(c("SL.mean", "SL.glm", "SL.earth", "SL.gam"), function(alg) c(alg, "All")), prop.trunc=0, prop.pred = NULL,
                                         verbose=FALSE) {
     list(cross.fit = cross.fit, V = V, folds = folds, eval.times = eval.times,
          event.SL.library = event.SL.library, event.pred.0 = event.pred.0, event.pred.1 = event.pred.1, event.pred = event.pred,
@@ -265,9 +265,9 @@ CFsurvival.nuisance.options <- function(cross.fit = TRUE, V = ifelse(cross.fit, 
             ret$prop.fit <- list(whichScreen = whichScreen, pred.alg = prop.fit)
         }
     } else {
-        prop.fit <- SuperLearner(Y=A, X=W, newX=newW, family='binomial',
-                                 SL.library=SL.library, method = "method.NNloglik", verbose = verbose)
-        # prop.fit <- prop.gam(A=A, X=W, newX=newW)
+        # prop.fit <- SuperLearner(Y=A, X=W, newX=newW, family='binomial',
+        #                          SL.library=SL.library, method = "method.NNloglik", verbose = verbose)
+        prop.fit <- prop.gam(A=A, X=W, newX=newW)
         ret$prop.pred <- c(prop.fit$SL.predict)
         if(save.fit) ret$prop.fit <- prop.fit
     }
@@ -288,14 +288,14 @@ CFsurvival.nuisance.options <- function(cross.fit = TRUE, V = ifelse(cross.fit, 
     # S(t|A,W) and G(t|A,W)
     newAW <- rbind(newAW, cbind(A=newA, newW))
 
-    res <- require(survSuperLearner)
-    if(!res) stop("Please install the package survSuperLearner via:\n devtools::install_github('tedwestling/survSuperLearner')")
+    # res <- require(survSuperLearner)
+    # if(!res) stop("Please install the package survSuperLearner via:\n devtools::install_github('tedwestling/survSuperLearner')")
     if(is.null(survSL.control)) survSL.control <- list(saveFitLibrary = save.fit)
 
-    fit <- survSuperLearner(time = Y, event = Delta,  X = AW, newX = newAW, new.times = fit.times,
-                            event.SL.library = event.SL.library, cens.SL.library = cens.SL.library,
-                            verbose=verbose, control = survSL.control, cvControl = survSL.cvControl)
-    # fit <- surv.gam(time = Y, event = Delta,  X = AW, newX = newAW, new.times = fit.times)
+    # fit <- survSuperLearner(time = Y, event = Delta,  X = AW, newX = newAW, new.times = fit.times,
+    #                         event.SL.library = event.SL.library, cens.SL.library = cens.SL.library,
+    #                         verbose=verbose, control = survSL.control, cvControl = survSL.cvControl)
+    fit <- surv.gam(time = Y, event = Delta,  X = AW, newX = newAW, new.times = fit.times)
     if(save.fit) ret$surv.fit <- fit
 
     pred_n <- nrow(newW)
@@ -347,25 +347,26 @@ CFsurvival.nuisance.options <- function(cross.fit = TRUE, V = ifelse(cross.fit, 
     return(ret)
 }
 
-# surv.gam <- function(time, event, X, newX, new.times){
-#     gam.model <- as.formula(paste("time~", paste(colnames(X),
-#                                                  collapse = "+"), sep = ""))
-#     fit.gam.event <- mgcv::gam(gam.model, family=mgcv::cox.ph(), data = X, weights=event)
-#     fit.gam.cens <- mgcv::gam(gam.model, family=mgcv::cox.ph(), data = X, weights=1-event)
-#
-#     new.data <- data.frame(time=rep(new.times, each = nrow(newX)))
-#     for (col in names(newX)) new.data[[col]] <- rep(newX[[col]], length(new.times))
-#
-#     event.predict <- predict(fit.gam.event, newdata=new.data, type="response", se=FALSE)
-#     event.predict <- matrix(event.predict, nrow = nrow(newX), ncol = length(new.times))
-#
-#     cens.predict <- predict(fit.gam.cens, newdata=new.data, type="response", se=FALSE)
-#     cens.predict <- matrix(cens.predict, nrow = nrow(newX), ncol = length(new.times))
-#
-#     out <- list(event.SL.predict = event.predict,
-#                 cens.SL.predict = cens.predict)
-#     return(out)
-# }
+
+surv.gam <- function(time, event, X, newX, new.times){
+    gam.model <- as.formula(paste("time~", paste(colnames(X),
+                                                 collapse = "+"), sep = ""))
+    fit.gam.event <- mgcv::gam(gam.model, family=mgcv::cox.ph(), data = X, weights=event)
+    fit.gam.cens <- mgcv::gam(gam.model, family=mgcv::cox.ph(), data = X, weights=1-event)
+
+    new.data <- data.frame(time=rep(new.times, each = nrow(newX)))
+    for (col in names(newX)) new.data[[col]] <- rep(newX[[col]], length(new.times))
+
+    event.predict <- predict(fit.gam.event, newdata=new.data, type="response", se=FALSE)
+    event.predict <- matrix(event.predict, nrow = nrow(newX), ncol = length(new.times))
+
+    cens.predict <- predict(fit.gam.cens, newdata=new.data, type="response", se=FALSE)
+    cens.predict <- matrix(cens.predict, nrow = nrow(newX), ncol = length(new.times))
+
+    out <- list(event.SL.predict = event.predict,
+                cens.SL.predict = cens.predict)
+    return(out)
+}
 
 prop.gam <- function(A, X, newX){
     gam.model <- as.formula(paste("A~", paste(colnames(X),

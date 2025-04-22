@@ -1,7 +1,17 @@
-# estimate the identifiable components from the observed distribution
-# input: observed data, nuisance estimators
-# output: estimators and IF
-
+#' Estimate Observed Components (Internal)
+#'
+#' Internal utility function to compute observed survival differences from fitted nuisance functions.
+#'
+#' @param time Numeric vector of survival times.
+#' @param event Numeric vector of event indicators (1 = event, 0 = censored).
+#' @param treat Numeric vector of treatment assignments.
+#' @param result List containing nuisance function results.
+#' @param psi.type Character; type of psi estimation ("hybrid", "simple", etc.).
+#' @param verbose Logical; print messages if TRUE.
+#'
+#' @return Updated result list with observed treatment effects.
+#'
+#' @keywords internal
 .get.obs.comps <- function(time, event, treat, result, psi.type, verbose=TRUE){
 
     fit.times <- result$fit.times

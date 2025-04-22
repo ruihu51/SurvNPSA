@@ -1,3 +1,6 @@
+#' Estimate observed components
+#'
+#' @keywords internal
 .report.RV <- function(rv.time, result, conf.level = .95, unif = TRUE, q.01, q.99) {
   res.list <- list()
 
@@ -47,6 +50,17 @@
   return(out)
 }
 
+#' Summarize Reported Robustness Value (RV)
+#'
+#' Summary method for objects of class \code{reportRV}.
+#'
+#' @param object An object of class \code{reportRV}.
+#' @param ... Additional arguments (currently unused).
+#'
+#' @return Printed robustness value results.
+#'
+#' @export
+#' @method summary reportRV
 summary.reportRV <- function(object, digits = 3, ...) {
   cat("Robustness Value Report\n")
   cat("------------------------\n")
@@ -66,6 +80,9 @@ summary.reportRV <- function(object, digits = 3, ...) {
   }
 }
 
+#' Estimate observed components
+#'
+#' @keywords internal
 .interpret.RV <- function(t0, res.RV, sens.df, sens.df.mean, var_names,
                           type = c("RV", "MIRV", "URV")) {
 
@@ -205,13 +222,27 @@ summary.reportRV <- function(object, digits = 3, ...) {
     return(out)
 }
 
+#' Summarize Robustness Value (RV) Results
+#'
+#' Summary method for objects of class \code{interpretRV}, typically created
+#' by sensitivity analysis functions in the \code{npsaSurv} package.
+#'
+#' @param object An object of class \code{interpretRV}.
+#' @param ... Additional arguments (currently unused).
+#'
+#' @return A printed summary of robustness values and key interpretations.
+#'
+#' @export
+#' @method summary interpretRV
 summary.interpretRV <- function(object, ...) {
     cat(object$title, "\n\n")
     print(object$table)
     invisible(object)
 }
 
-
+#' Estimate observed components
+#'
+#' @keywords internal
 .report.bounds <- function(plot.times, result, sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
                            rmst = TRUE, sens.rmst.df.mean = NULL) {
 
@@ -379,6 +410,17 @@ summary.interpretRV <- function(object, ...) {
     }
 }
 
+#' Plot boundsdf object
+#'
+#' Plot method for objects of class \code{boundsdf}.
+#'
+#' @param x An object of class \code{boundsdf}.
+#' @param ... Additional arguments (currently unused).
+#'
+#' @return A \code{ggplot} object showing sensitivity bounds.
+#'
+#' @export
+#' @method plot boundsdf
 plot.boundsdf <- function(x, ...) {
     x %>%
         mutate(setting = paste0("Drop ", d, " confounder", ifelse(d > 1, "s", ""))) %>%

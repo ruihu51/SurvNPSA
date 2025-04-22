@@ -1,3 +1,18 @@
+#' Compute Effect Bounds (Internal)
+#'
+#' Internal utility function to compute the sensitivity analysis effect bounds.
+#'
+#' @param fit.times Numeric vector of times where bounds are evaluated.
+#' @param theta.obs Numeric vector of observed differences.
+#' @param psi Numeric vector of treatment assignment probabilities.
+#' @param tau Truncation parameter.
+#' @param sens.out Sensitivity parameter for outcome model.
+#' @param sens.trt Sensitivity parameter for treatment model.
+#' @param rho Correlation parameter.
+#'
+#' @return A list of lower and upper bounds at specified times.
+#'
+#' @keywords internal
 .get.effect.bounds <- function(fit.times, theta.obs, psi, tau, sens.out, sens.trt, rho=1){
   # theta.obs <- c(1,2,3,5,7)
   # psi <- c(1,2,3,5,7)
@@ -14,6 +29,21 @@
   return(res)
 }
 
+#' Compute Confidence Intervals for Effect Bounds (Internal)
+#'
+#' Internal utility function to compute pointwise and uniform confidence intervals for the estimated effect bounds.
+#'
+#' @param effect.bounds List containing lower and upper bounds for the effect.
+#' @param psi Numeric vector of treatment probabilities at each time point.
+#' @param tau Truncation parameter for survival times.
+#' @param IF.vals.theta.obs Influence function values for observed treatment effect estimates.
+#' @param IF.vals.psi Influence function values for treatment probability estimates.
+#' @param IF.vals.tau Influence function values for tau.
+#' @param conf.level Confidence level for intervals (default is 0.975).
+#'
+#' @return A list with confidence intervals for effect bounds, pointwise and uniform bands.
+#'
+#' @keywords internal
 .bounds.confints <- function(effect.bounds, psi, tau,
                              IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
                              rho=1, band.end.pts = c(0,Inf), conf.level=.95){
@@ -113,6 +143,20 @@
   return(res)
 }
 
+#' Convert Bounds and Confidence Intervals to Data Frame (Internal)
+#'
+#' Internal utility function to organize effect bounds and confidence intervals
+#' into a tidy data frame for plotting or downstream analysis.
+#'
+#' @param bounds.conf.int List containing lower/upper confidence intervals and uniform bands.
+#' @param theta.obs Numeric vector of observed treatment effect estimates.
+#' @param d Number of dropped confounders (for labeling, optional).
+#' @param transform Logical; whether to transform the bounds to survival differences.
+#' @param time.zero Logical; whether to add a zero starting point at time = 0.
+#'
+#' @return A \code{data.frame} ready for plotting or reporting.
+#'
+#' @keywords internal
 bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.zero=TRUE){
     if (is.null(d)){
         d=0
@@ -153,7 +197,19 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 ##############
 # testing
 ##############
-
+#' Compute Uniform Robustness Value (Internal)
+#'
+#' Internal utility function to compute the Uniform Robustness Value (RV)
+#' for sensitivity analysis across multiple time points.
+#'
+#' @param eval.times Numeric vector of times at which robustness values are evaluated.
+#' @param rv Numeric vector of pointwise robustness values at each time.
+#' @param q.01 Estimated lower bound (e.g., 1% survival quantile).
+#' @param q.99 Estimated upper bound (e.g., 99% survival quantile).
+#'
+#' @return Numeric value representing the uniform robustness value.
+#'
+#' @keywords internal
 .get.uniform.RV <- function(theta.obs, psi, tau,
                             IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
                             rho=1, conf.level=.95){
@@ -272,6 +328,19 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 # (IF.vals.theta.obs[,3] - inner.func.2)[1:10]
 
 #################
+#' Compute Pointwise Robustness Value (Internal)
+#'
+#' Internal utility function to compute the Pointwise Robustness Value (RV)
+#' for sensitivity analysis at specific evaluation times.
+#'
+#' @param eval.times Numeric vector of evaluation times.
+#' @param theta.obs Numeric vector of observed treatment effect estimates at evaluation times.
+#' @param effect.lower Numeric vector of lower bounds at evaluation times.
+#' @param effect.upper Numeric vector of upper bounds at evaluation times.
+#'
+#' @return A numeric vector of pointwise robustness values corresponding to each evaluation time.
+#'
+#' @keywords internal
 .get.RV <- function(t0, fit.times, theta.obs, psi, tau,
                     IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
                     rho=1, theta=0, conf.bounds=TRUE, transform=FALSE, conf.level=.95, verbose=TRUE){
