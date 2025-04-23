@@ -3,7 +3,7 @@
 #' @keywords internal
 .simulate.senspar <- function(time, event, treat, confounders,
                               fit.times,
-                              psi, tau, S.hat.obs, pi.hat.obs,
+                              psi, tau, S.hat.obs, g.hat.obs,
                               num_drop = NULL, pct_drop = NULL, rep = 100, seed = 6741,
                               rmst = TRUE, fit.times.rmst = NULL, gamma = NULL, max_gap = NULL, tol=NULL){
 
@@ -83,8 +83,11 @@
 
       S.hat.obs.drop <- result.sim.drop$nuisance$event.pred
 
-      alpha.drop <- (-1)^(event-1)*(1/result.sim.drop$nuisance$prop.pred)
-      alpha.obs <- (-1)^(event-1)*(1/pi.hat.obs)
+      g.hat.obs.drop <- result.sim.drop$nuisance$prop.pred
+
+      alpha.drop <- (treat - g.hat.obs.drop)/(g.hat.obs.drop*(1 - g.hat.obs.drop))
+      alpha.obs <- (treat - g.hat.obs)/(g.hat.obs*(1 - g.hat.obs))
+
 
       V.g.matrix.psi <- colMeans((S.hat.obs - S.hat.obs.drop)^2)
 

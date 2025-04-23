@@ -77,8 +77,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     tol2 <- rmst.options$tol2
     pct_drop <- sens.options$pct_drop
     rep <- sens.options$rep
-    sens.df.mean <- sens.options$sens.df.mean
-    sens.rmst.df.mean <- sens.options$sens.rmst.df.mean
+    senspar.df <- sens.options$senspar.df
     num_drop <- sens.options$num_drop
 
     n_var <- ncol(confounders)
@@ -121,13 +120,13 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
     # Simulate sensitivity parameters if needed
     if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    if (is.null(sens.df.mean)) {
+    if (is.null(senspar.df)) {
         senspar.df <- .simulate.senspar(time, event, treat, confounders,
                                         fit.times = result$fit.times,
                                         psi = result$obs.comps.df$psi,
                                         tau = result$tau,
                                         S.hat.obs = result$nuisance$event.pred,
-                                        pi.hat.obs = result$nuisance$prop.pred,
+                                        g.hat.obs = result$nuisance$prop.pred,
                                         pct_drop = pct_drop,
                                         rep = rep,
                                         rmst = rmst,
@@ -137,19 +136,22 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                         tol = if (rmst) tol else NULL)
         if (save) save(senspar.df, file = "dev/senspar.df.RData")
     } else {
-        senspar.df <- list(sens.df.mean = sens.df.mean,
-                           sens.rmst.df.mean = sens.rmst.df.mean)
+        senspar.df <- senspar.df
     }
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(plot.times, result,
+    bounds.df.sens <- .report.bounds(plot.times, result,
                                 sens.df.mean = senspar.df$sens.df.mean,
                                 num_drop = num_drop,
                                 pct_drop = pct_drop,
                                 n_var = n_var,
                                 rmst = rmst,
                                 sens.rmst.df.mean = senspar.df$sens.rmst.df.mean)
+
+    bounds.df$bounds.df <- rbind(bounds.df$bounds.df, bounds.df.sens$bounds.df)
+    if (rmst) bounds.df$bounds.df.rmst <- rbind(bounds.df$bounds.df.rmst, bounds.df.sens$bounds.df.rmst)
+
 
     # Plot if requested
     if (plot) {
@@ -195,9 +197,8 @@ npsa_rmst.options <- function(fit.times.rmst = c(0.5, 0.7, 2), gamma.type = "hyb
 }
 
 npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
-                              sens.df.mean = NULL, sens.rmst.df.mean = NULL, num_drop = NULL) {
-    list(pct_drop = pct_drop, rep = rep, sens.df.mean = sens.df.mean,
-         sens.rmst.df.mean = sens.rmst.df.mean, num_drop = num_drop)
+                              senspar.df = NULL, num_drop = NULL) {
+    list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df, num_drop = num_drop)
 }
 
 

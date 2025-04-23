@@ -18,3 +18,5 @@ Imports:
     survival,
     dplyr,
     ggplot2
+Depends: 
+    R (>= 3.5)
