@@ -1,10 +1,15 @@
 #' Estimate observed components
 #'
 #' @keywords internal
-.report.RV <- function(rv.time, result, conf.level = .95, unif = TRUE, q.01, q.99) {
+.report.RV <- function(rv.times, result, conf.level = .95, unif = TRUE, q.01, q.99) {
   res.list <- list()
 
-  for (t0 in rv.time){
+  if (any(rv.times > max(result$fit.times))) {
+      message("Some rv.times > maximum observed event time - removed for RV computation.")
+      rv.times <- rv.times[rv.times <= max(result$fit.times)]
+  }
+
+  for (t0 in rv.times){
     res.RV <- .get.RV(
       t0,
       fit.times = result$fit.times,
@@ -117,6 +122,8 @@ summary.reportRV <- function(object, digits = 3, ...) {
         out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
 
         half_d <- ceiling(n_var * 0.5)
+        cat(half_d, "\n")
+
 
         out <- mean(
             sens.df %>%
@@ -126,12 +133,17 @@ summary.reportRV <- function(object, digits = 3, ...) {
                 pull(value)
         )
 
-        out.half <- if (out == 1) NULL else out
+        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
+            NULL
+        } else {
+            out
+        }
     }
 
     if ("MIRV" %in% type) {
         rv <- res.table[res.table$t0 == t0, "MIRV"]
         sp.pw <- rv^2 / (1 - rv)
+        print(sp.pw)
 
         out <- sens.df %>%
             mutate(sens.par = C.Y.sq * C.A.sq, confounder = var_names[j]) %>%
@@ -143,6 +155,8 @@ summary.reportRV <- function(object, digits = 3, ...) {
             filter(near(t, t0)) %>%
             arrange(d) %>%
             mutate(sig.point = sens.par > sp.pw)
+
+        print(out)
 
         change.idx <- which(diff(out$sig.point) == 1)
         out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
@@ -157,7 +171,11 @@ summary.reportRV <- function(object, digits = 3, ...) {
                 pull(value)
         )
 
-        out.half <- if (out == 1) NULL else out
+        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
+            NULL
+        } else {
+            out
+        }
     }
 
     if ("URV" %in% type) {
@@ -198,7 +216,11 @@ summary.reportRV <- function(object, digits = 3, ...) {
                 pull(value)
         )
 
-        out.half <- if (out == 1) NULL else out
+        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
+            NULL
+        } else {
+            out
+        }
     }
 
     # ------ FINAL summary output --------
@@ -245,6 +267,11 @@ summary.interpretRV <- function(object, ...) {
 #' @keywords internal
 .report.bounds <- function(plot.times, result, sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
                            rmst = TRUE, sens.rmst.df.mean = NULL) {
+
+    if (any(plot.times > max(result$fit.times))) {
+        message("Some plot.times > maximum observed event time - removed for plot.")
+        plot.times <- plot.times[plot.times <= max(result$fit.times)]
+    }
 
     if (is.null(sens.df.mean)) {
 

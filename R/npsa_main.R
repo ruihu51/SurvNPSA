@@ -54,7 +54,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                       result = NULL,
                       var_names = NULL,
                       plot = TRUE,
-                      verbose = FALSE) {
+                      verbose = FALSE,
+                      save = FALSE) {
 
     # Update control parameters
     target.options <- do.call(npsa_target.options, target.options)
@@ -89,12 +90,15 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     if (is.null(result) || is.null(result$nuisance)) {
         result <- .get.nuisances.est(time, event, treat, confounders, fit.times,
                                      nuisance.options = nuisance.options, verbose = verbose)
+
+        if (save) save(result, file = "dev/result.RData")
     }
 
     # Observed Components Estimation
     if (verbose) cat("Start estimating target:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     if (is.null(result$obs.comps.df)) {
         result <- .get.obs.comps(time, event, treat, result, psi.type = psi.type, verbose = verbose)
+        if (save) save(result, file = "dev/result.RData")
     }
 
     # RMST Estimation if requested
@@ -107,6 +111,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
             result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
                                           max_gap, tol, tol1, tol2,
                                           gamma.type, verbose = verbose)
+            if (save) save(result, file = "dev/result.RData")
         }
     }
 
@@ -122,6 +127,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                         psi = result$obs.comps.df$psi,
                                         tau = result$tau,
                                         S.hat.obs = result$nuisance$event.pred,
+                                        pi.hat.obs = result$nuisance$prop.pred,
                                         pct_drop = pct_drop,
                                         rep = rep,
                                         rmst = rmst,
@@ -129,6 +135,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                         gamma = if (rmst) result$gamma.est else NULL,
                                         max_gap = if (rmst) max_gap else NULL,
                                         tol = if (rmst) tol else NULL)
+        if (save) save(senspar.df, file = "dev/senspar.df.RData")
     } else {
         senspar.df <- list(sens.df.mean = sens.df.mean,
                            sens.rmst.df.mean = sens.rmst.df.mean)
@@ -157,6 +164,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         q.01 <- quantile(time[event == 1], uniform.cutpoint[1])
         q.99 <- quantile(time[event == 1], uniform.cutpoint[2])
+        cat(q.01, q.99, "\n")
 
         out$res.RV <- .report.RV(rv.times, result, unif = TRUE, q.01 = q.01, q.99 = q.99)
     }
@@ -193,12 +201,6 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
 }
 
 
-# # TODO: take .interpret.RV out of the function
-# interp.RV <- .interpret.RV(t0=1.2, res.RV,
-#                            sens.df = senspar.df$sens.df,
-#                            sens.df.mean = senspar.df$sens.df.mean,
-#                            var_names, type = c("RV", "MIRV", "URV"))
-#
-# # summary(interp.RV)
+
 
 
