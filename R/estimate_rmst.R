@@ -13,7 +13,7 @@ library(cubature)
         fit.times.rmst <- fit.times.rmst[fit.times.rmst <= max(result$fit.times)]
     }
 
-    cat("1", "\n")
+    # cat("1", "\n")
     gap <- max(diff(sort(eval.times.rmst[eval.times.rmst >= min(eval.times.rmst) & eval.times.rmst <= max(fit.times.rmst)])))
     if (gap > max_gap) {
         stop(sprintf(

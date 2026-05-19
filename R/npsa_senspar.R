@@ -57,7 +57,10 @@
         confounders.drop <- confounders[,-(drop.index[,j])]
       } else {
         confounders.drop <- confounders[,-(drop.index[j])]
+        confounders.drop <- confounders[,-(var_list[[drop.index[j]]])]
       }
+
+      cat(names(confounders)[!(names(confounders) %in% names(confounders.drop))], "\n")
 
       result.sim.drop <- .get.nuisances.est(time = time,
                                             event = event,

@@ -1,7 +1,8 @@
 #' Estimate observed components
 #'
 #' @keywords internal
-.report.RV <- function(rv.times, result, conf.level = .95, unif = TRUE, q.01, q.99) {
+.report.RV <- function(rv.times, result, rho = 1,
+                       conf.level = .95, unif = TRUE, q.01, q.99) {
   res.list <- list()
 
   if (any(rv.times > max(result$fit.times))) {
@@ -19,7 +20,8 @@
       IF.vals.theta.obs = result$IF.vals.theta.obs,
       IF.vals.psi = result$IF.vals.psi,
       IF.vals.tau = result$IF.vals.tau,
-      conf.level = 1 - (1 - conf.level)/2
+      rho = rho,
+      conf.level = conf.level
     )
 
     res.list[[length(res.list) + 1]] <- list(
@@ -28,7 +30,8 @@
       RV = res.RV$bounds.RV,
       MIRV = res.RV$bounds.int.RV,
       conf.level = res.RV$conf.level,
-      lower.b = if (is.null(res.RV$lower.b)) NA else res.RV$lower.b
+      lower.b = if (is.null(res.RV$lower.b)) NA else res.RV$lower.b,
+      rho = rho
     )
   }
 
@@ -46,9 +49,11 @@
       IF.vals.theta.obs = result$IF.vals.theta.obs[,unif.idx],
       IF.vals.psi = result$IF.vals.psi[,unif.idx],
       IF.vals.tau = result$IF.vals.tau,
+      rho = rho,
       conf.level = conf.level
     )
     out$unif.RV <- unif.RV
+    out$unif.idx <- unif.idx
   }
 
   class(out) <- "reportRV"
@@ -89,7 +94,7 @@ summary.reportRV <- function(object, digits = 3, ...) {
 #'
 #' @keywords internal
 .interpret.RV <- function(t0, res.RV, sens.df, sens.df.mean, var_names,
-                          type = c("RV", "MIRV", "URV")) {
+                          type = c("RV", "MIRV")) {
 
     res.table <- res.RV$res.table
 
@@ -98,21 +103,21 @@ summary.reportRV <- function(object, digits = 3, ...) {
     }
 
     n_var <- length(var_names)
-
-    # Initialize empty outputs
     out.1 <- out.d <- out.half <- NULL
-    out.1.unif <- out.d.unif <- out.half.unif <- NULL
+
 
     if ("RV" %in% type) {
         rv <- res.table[res.table$t0 == t0, "RV"]
         sp.point <- rv^2 / (1 - rv)
 
+        # leave-1-out
         out <- sens.df %>%
             mutate(sens.par = C.Y.sq * C.A.sq, confounder = var_names[j]) %>%
             filter(near(t, t0) & d == 1, sens.par > sp.point)
 
         out.1 <- if (nrow(out) == 0) NULL else out$confounder
 
+        # leave-d-out
         out <- sens.df.mean %>%
             filter(near(t, t0)) %>%
             arrange(d) %>%
@@ -121,9 +126,9 @@ summary.reportRV <- function(object, digits = 3, ...) {
         change.idx <- which(diff(out$sig.point) == 1)
         out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
 
+        # leave-half-out
         half_d <- ceiling(n_var * 0.5)
-        cat(half_d, "\n")
-
+        # cat(half_d, "\n")
 
         out <- mean(
             sens.df %>%
@@ -143,7 +148,7 @@ summary.reportRV <- function(object, digits = 3, ...) {
     if ("MIRV" %in% type) {
         rv <- res.table[res.table$t0 == t0, "MIRV"]
         sp.pw <- rv^2 / (1 - rv)
-        print(sp.pw)
+        # print(sp.pw)
 
         out <- sens.df %>%
             mutate(sens.par = C.Y.sq * C.A.sq, confounder = var_names[j]) %>%
@@ -156,8 +161,6 @@ summary.reportRV <- function(object, digits = 3, ...) {
             arrange(d) %>%
             mutate(sig.point = sens.par > sp.pw)
 
-        print(out)
-
         change.idx <- which(diff(out$sig.point) == 1)
         out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
 
@@ -168,51 +171,6 @@ summary.reportRV <- function(object, digits = 3, ...) {
                 mutate(sens.par = C.Y.sq * C.A.sq) %>%
                 filter(near(t, t0) & d == half_d) %>%
                 mutate(value = sens.par <= sp.pw) %>%
-                pull(value)
-        )
-
-        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
-            NULL
-        } else {
-            out
-        }
-    }
-
-    if ("URV" %in% type) {
-        unif.RV <- res.RV$unif.RV
-        sp.unif <- unif.RV^2 / (1 - unif.RV)
-
-        out.unif <- sens.df %>%
-            mutate(sens.par = C.Y.sq * C.A.sq) %>%
-            group_by(d, j) %>%
-            summarize(sens.par = max(sens.par), .groups = "drop") %>%
-            ungroup() %>%
-            filter(d == 1, sens.par > sp.unif) %>%
-            mutate(confounder = var_names[j])
-
-        out.1 <- if (nrow(out.unif) == 0) NULL else out.unif$confounder
-
-        out.unif <- sens.df %>%
-            mutate(sens.par = C.Y.sq * C.A.sq) %>%
-            group_by(d, j) %>%
-            summarize(sens.par = max(sens.par), .groups = "drop") %>%
-            ungroup() %>%
-            group_by(d) %>%
-            summarize(sens.par = mean(sens.par), .groups = "drop") %>%
-            arrange(d) %>%
-            mutate(sig.unif = sens.par > sp.unif)
-
-        change.idx <- which(diff(out.unif$sig.unif) == 1)
-        out.d <- if (length(change.idx) > 0) c(out.unif$d[change.idx], out.unif$d[change.idx + 1]) else NULL
-
-        out <- mean(
-            sens.df %>%
-                mutate(sens.par = C.Y.sq * C.A.sq) %>%
-                group_by(d, j) %>%
-                summarize(sens.par = max(sens.par), .groups = "drop") %>%
-                ungroup() %>%
-                filter(d == ceiling(n_var * 0.5)) %>%
-                mutate(value = sens.par <= sp.unif) %>%
                 pull(value)
         )
 
@@ -244,6 +202,90 @@ summary.reportRV <- function(object, digits = 3, ...) {
     return(out)
 }
 
+
+.interpret.URV <- function(fit.times, res.RV, sens.df, sens.df.mean, var_names){
+
+    unif.RV <- res.RV$unif.RV
+    unif.idx <- res.RV$unif.idx
+    sp.unif <- unif.RV^2 / (1 - unif.RV)
+
+    n_var <- length(var_names)
+    out.1 <- out.d <- out.half <- NULL
+
+    out.unif <- sens.df %>%
+        filter(
+            t >= min(fit.times[unif.idx], na.rm = TRUE) &
+            t <= max(fit.times[unif.idx], na.rm = TRUE)
+        ) %>%
+        mutate(sens.par = C.Y.sq * C.A.sq) %>%
+        group_by(d, j) %>%
+        summarize(sens.par = max(sens.par), .groups = "drop") %>%
+        ungroup() %>%
+        filter(d == 1, sens.par > sp.unif) %>%
+        mutate(confounder = var_names[j])
+
+    out.1 <- if (nrow(out.unif) == 0) NULL else out.unif$confounder
+
+    out.unif <- sens.df %>%
+        filter(
+            t >= min(fit.times[unif.idx], na.rm = TRUE) &
+            t <= max(fit.times[unif.idx], na.rm = TRUE)
+        ) %>%
+        mutate(sens.par = C.Y.sq * C.A.sq) %>%
+        group_by(d, j) %>%
+        summarize(sens.par = max(sens.par), .groups = "drop") %>%
+        ungroup() %>%
+        group_by(d) %>%
+        summarize(sens.par = mean(sens.par), .groups = "drop") %>%
+        arrange(d) %>%
+        mutate(sig.unif = sens.par > sp.unif)
+
+    change.idx <- which(diff(out.unif$sig.unif) == 1)
+    out.d <- if (length(change.idx) > 0) c(out.unif$d[change.idx], out.unif$d[change.idx + 1]) else NULL
+
+    out <- mean(
+        sens.df %>%
+            filter(
+                t >= min(fit.times[unif.idx], na.rm = TRUE) &
+                t <= max(fit.times[unif.idx], na.rm = TRUE)
+            ) %>%
+            mutate(sens.par = C.Y.sq * C.A.sq) %>%
+            group_by(d, j) %>%
+            summarize(sens.par = max(sens.par), .groups = "drop") %>%
+            ungroup() %>%
+            filter(d == ceiling(n_var * 0.5)) %>%
+            mutate(value = sens.par <= sp.unif) %>%
+            pull(value)
+    )
+
+    out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
+        NULL
+    } else {
+        out
+    }
+
+    # ------ FINAL summary output --------
+
+    summary_table <- tibble::tibble(
+        Method = c("Leave-one-out", "Leave-d-out", "Leave-half-out"),
+        Interpretation = c(
+            if (is.null(out.1)) "None" else paste(out.1, collapse = ", "),
+            if (is.null(out.d)) "None" else paste0("d=", paste(out.d, collapse = " and d=")),
+            if (is.null(out.half)) "None" else paste0(round((out.half) * 100, 1), "th percentile")
+        )
+    )
+
+    title_line <- paste0("Interpretation of URV")
+
+    out <- list(
+        title = title_line,
+        table = summary_table
+    )
+    class(out) <- "interpretRV"
+    return(out)
+
+}
+
 #' Summarize Robustness Value (RV) Results
 #'
 #' Summary method for objects of class \code{interpretRV}, typically created
@@ -265,8 +307,9 @@ summary.interpretRV <- function(object, ...) {
 #' Estimate observed components
 #'
 #' @keywords internal
-.report.bounds <- function(plot.times, result, sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
-                           rmst = TRUE, sens.rmst.df.mean = NULL) {
+.report.bounds <- function(plot.times, result, rho=1, band.end.pts = c(0,Inf), conf.level=.95, boot=10000,
+                           sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
+                           rmst = TRUE, sens.rmst.df.mean = NULL, transform = TRUE, scale = TRUE) {
 
     if (any(plot.times > max(result$fit.times))) {
         message("Some plot.times > maximum observed event time - removed for plot.")
@@ -287,7 +330,7 @@ summary.interpretRV <- function(object, ...) {
             tau = result$tau,
             sens.out = rep(0, length(plot.times)),
             sens.trt = 0,
-            rho = 1
+            rho = rho
         )
 
         bounds.conf.int <- .bounds.confints(
@@ -297,11 +340,15 @@ summary.interpretRV <- function(object, ...) {
             IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx],
             IF.vals.psi = result$IF.vals.psi[, obs.est.idx],
             IF.vals.tau = result$IF.vals.tau,
-            conf.level = 0.975
+            rho = rho,
+            band.end.pts = band.end.pts,
+            conf.level = conf.level,
+            scale = scale,
+            boot = boot
         )
 
         bounds.df <- bounds2df(bounds.conf.int, theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
-                               d = NULL, transform = TRUE, time.zero = TRUE)
+                               d = NULL, transform = transform, time.zero = TRUE)
 
         bounds.df.rmst <- NULL
 
@@ -314,7 +361,7 @@ summary.interpretRV <- function(object, ...) {
                 tau = result$tau,
                 sens.out = rep(0, length(result$rmst.obs)),
                 sens.trt = 0,
-                rho = 1
+                rho = rho
             )
 
             bounds.conf.int.rmst <- .bounds.confints(
@@ -324,11 +371,15 @@ summary.interpretRV <- function(object, ...) {
                 IF.vals.theta.obs = result$IF.vals.rmst.obs,
                 IF.vals.psi = result$IF.vals.gamma,
                 IF.vals.tau = result$IF.vals.tau,
-                conf.level = 0.975
+                rho = rho,
+                band.end.pts = band.end.pts,
+                conf.level = conf.level,
+                scale = scale,
+                boot = boot
             )
 
             bounds.df.rmst <- bounds2df(bounds.conf.int.rmst, theta.obs = result$rmst.obs,
-                                        d = NULL, transform = TRUE, time.zero = FALSE)
+                                        d = NULL, transform = FALSE, time.zero = FALSE)
         }
 
         class(bounds.df) <- c("boundsdf", "data.frame")
@@ -377,7 +428,7 @@ summary.interpretRV <- function(object, ...) {
                 tau = result$tau,
                 sens.out = sens.out.true.input[senspar.idx],
                 sens.trt = sens.trt.true,
-                rho = 1
+                rho = rho
             )
 
             bounds.conf.int <- .bounds.confints(
@@ -387,11 +438,12 @@ summary.interpretRV <- function(object, ...) {
                 IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx],
                 IF.vals.psi = result$IF.vals.psi[, obs.est.idx],
                 IF.vals.tau = result$IF.vals.tau,
-                conf.level = 0.975
+                conf.level = conf.level,
+                scale = scale
             )
 
             df <- bounds2df(bounds.conf.int, theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
-                            d = d, transform = TRUE, time.zero = TRUE)
+                            d = d, transform = transform, time.zero = TRUE)
 
             bounds.df <- rbind(bounds.df, df)
 
@@ -409,7 +461,7 @@ summary.interpretRV <- function(object, ...) {
                     tau = result$tau,
                     sens.out = sens.out.true.input.rmst,
                     sens.trt = 1,
-                    rho = 1
+                    rho = rho
                 )
 
                 bounds.conf.int.rmst <- .bounds.confints(
@@ -419,11 +471,12 @@ summary.interpretRV <- function(object, ...) {
                     IF.vals.theta.obs = result$IF.vals.rmst.obs,
                     IF.vals.psi = result$IF.vals.gamma,
                     IF.vals.tau = result$IF.vals.tau,
-                    conf.level = 0.975
+                    conf.level = conf.level,
+                    scale = scale,
                 )
 
                 df.rmst <- bounds2df(bounds.conf.int.rmst, theta.obs = result$rmst.obs,
-                                     d = d, transform = TRUE, time.zero = FALSE)
+                                     d = d, transform = FALSE, time.zero = FALSE)
 
                 bounds.df.rmst <- rbind(bounds.df.rmst, df.rmst)
             }

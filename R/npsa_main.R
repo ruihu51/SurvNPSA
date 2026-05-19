@@ -53,7 +53,6 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                       sens.options = list(),
                       result = NULL,
                       var_names = NULL,
-                      plot = TRUE,
                       verbose = FALSE,
                       save = FALSE) {
 
@@ -67,6 +66,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     # Extract options
     psi.type <- target.options$psi.type
     plot.times <- bound.options$plot.times
+    transform <- bound.options$transform
+    scale <- bound.options$scale
     rv.times <- rv.options$rv.times
     uniform.cutpoint <- rv.options$uniform.cutpoint
     fit.times.rmst <- rmst.options$fit.times.rmst
@@ -81,8 +82,6 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     num_drop <- sens.options$num_drop
 
     n_var <- ncol(confounders)
-
-    ## --- Estimation Process ---
 
     # Nuisance Estimation
     if (verbose) cat("Start estimating nuisances:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -106,7 +105,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
         if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         if (is.null(result$rmst.obs)) {
             eval.times.rmst <- result$fit.times
-            cat(eval.times.rmst, "\n")
+            # cat(eval.times.rmst, "\n")
             result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
                                           max_gap, tol, tol1, tol2,
                                           gamma.type, verbose = verbose)
@@ -116,11 +115,11 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(plot.times, result, rmst = rmst)
+    bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform, scale = scale)
 
     # Simulate sensitivity parameters if needed
-    if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     if (is.null(senspar.df)) {
+        if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         senspar.df <- .simulate.senspar(time, event, treat, confounders,
                                         fit.times = result$fit.times,
                                         psi = result$obs.comps.df$psi,
@@ -136,6 +135,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                         tol = if (rmst) tol else NULL)
         if (save) save(senspar.df, file = "dev/senspar.df.RData")
     } else {
+        if (verbose) cat("Using user-provided sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         senspar.df <- senspar.df
     }
 
@@ -147,17 +147,18 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                 pct_drop = pct_drop,
                                 n_var = n_var,
                                 rmst = rmst,
-                                sens.rmst.df.mean = senspar.df$sens.rmst.df.mean)
+                                sens.rmst.df.mean = senspar.df$sens.rmst.df.mean,
+                                transform = transform, scale = scale)
 
     bounds.df$bounds.df <- rbind(bounds.df$bounds.df, bounds.df.sens$bounds.df)
     if (rmst) bounds.df$bounds.df.rmst <- rbind(bounds.df$bounds.df.rmst, bounds.df.sens$bounds.df.rmst)
 
 
     # Plot if requested
-    if (plot) {
-        if (verbose) cat("Start plotting:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        plot(bounds.df$bounds.df)
-    }
+    # if (plot) {
+    #     if (verbose) cat("Start plotting:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    #     plot(bounds.df$bounds.df)
+    # }
 
     out <- list(result = result, senspar.df = senspar.df, bounds.df = bounds.df)
 
@@ -182,8 +183,8 @@ npsa_target.options <- function(psi.type = "hybrid") {
     list(psi.type = psi.type)
 }
 
-npsa_bound.options <- function(plot.times = c(0.5, 0.8, 1.2)) {
-    list(plot.times = plot.times)
+npsa_bound.options <- function(plot.times = c(0.5, 0.8, 1.2), transform = TRUE, scale = TRUE) {
+    list(plot.times = plot.times, transform = transform, scale = scale)
 }
 
 npsa_rv.options <- function(rv.times = c(0.3, 0.5, 1.2), uniform.cutpoint = c(0.01, 0.99)) {
