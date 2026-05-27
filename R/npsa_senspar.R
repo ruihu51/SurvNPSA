@@ -66,7 +66,14 @@
                                             treat = treat,
                                             confounders = confounders.drop,
                                             fit.times = fit.times,
-                                            nuisance.options = list(),
+                                            nuisance.options = list(
+                                                event.SL.library = list(c("survSL.gam.custom", "All")),
+                                                cens.SL.library = list(c("survSL.gam.custom", "All")),
+                                                prop.SL.library = list(c("SL.gam.custom", "All")),
+                                                V = 5,
+                                                survSL.control = list(initWeightAlg = "survSL.gam.custom", verbose = FALSE),
+                                                survSL.cvControl = list(V = 5)
+                                            ),
                                             verbose = FALSE)
       result.sim.drop <- .get.obs.comps(time=time, event=event, treat=treat,
                                         result=result.sim.drop,
