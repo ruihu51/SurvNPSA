@@ -17,7 +17,8 @@ RoxygenNote: 7.3.2
 Imports:
     survival,
     dplyr,
-    ggplot2
+    ggplot2,
+    cubature
 Depends: 
     R (>= 3.5),
     survival,
