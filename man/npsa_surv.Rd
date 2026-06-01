@@ -20,7 +20,8 @@ npsa_surv(
   result = NULL,
   var_names = NULL,
   plot = TRUE,
-  verbose = FALSE
+  verbose = FALSE,
+  save = FALSE
 )
 }
 \arguments{
@@ -46,7 +47,9 @@ npsa_surv(
 
 \item{rmst.options}{List of options for RMST estimation.}
 
-\item{sens.options}{List of options for sensitivity parameter simulation.}
+\item{sens.options}{List of options for sensitivity parameter simulation.
+Use \code{senspar.save.path} to save generated sensitivity parameters to
+a custom path.}
 
 \item{result}{Optional precomputed result object (e.g., containing nuisances).}
 
@@ -55,6 +58,8 @@ npsa_surv(
 \item{plot}{Logical; if TRUE, automatically plot bounds after estimation.}
 
 \item{verbose}{Logical; if TRUE, print system timestamps for each estimation step.}
+
+\item{save}{Logical; if TRUE, save intermediate results.}
 }
 \value{
 A list of class \code{npsa_surv} containing:

@@ -16,10 +16,13 @@
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
+#'   Use \code{senspar.save.path} to save generated sensitivity parameters to
+#'   a custom path.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
 #' @param var_names Character vector of confounder variable names.
 #' @param plot Logical; if TRUE, automatically plot bounds after estimation.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.
+#' @param save Logical; if TRUE, save intermediate results.
 #'
 #' @return A list of class \code{npsa_surv} containing:
 #' \describe{
@@ -80,6 +83,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     rep <- sens.options$rep
     senspar.df <- sens.options$senspar.df
     num_drop <- sens.options$num_drop
+    senspar.save.path <- sens.options$senspar.save.path
 
     n_var <- ncol(confounders)
 
@@ -133,7 +137,11 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
                                         gamma = if (rmst) result$gamma.est else NULL,
                                         max_gap = if (rmst) max_gap else NULL,
                                         tol = if (rmst) tol else NULL)
-        if (save) save(senspar.df, file = "dev/senspar.df.RData")
+        if (save || !is.null(senspar.save.path)) {
+            if (is.null(senspar.save.path)) senspar.save.path <- "dev/senspar.df.RData"
+            dir.create(dirname(senspar.save.path), recursive = TRUE, showWarnings = FALSE)
+            save(senspar.df, file = senspar.save.path)
+        }
     } else {
         if (verbose) cat("Using user-provided sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         senspar.df <- senspar.df
@@ -198,11 +206,16 @@ npsa_rmst.options <- function(fit.times.rmst = c(0.5, 0.7, 2), gamma.type = "hyb
 }
 
 npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
-                              senspar.df = NULL, num_drop = NULL) {
-    list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df, num_drop = num_drop)
+                              senspar.df = NULL, num_drop = NULL,
+                              senspar.save.path = NULL) {
+    if (!is.null(senspar.save.path) &&
+        (!is.character(senspar.save.path) || length(senspar.save.path) != 1 ||
+         is.na(senspar.save.path) || !nzchar(senspar.save.path))) {
+        stop("'senspar.save.path' must be a non-empty character string or NULL.")
+    }
+
+    list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df,
+         num_drop = num_drop, senspar.save.path = senspar.save.path)
 }
-
-
-
 
 
