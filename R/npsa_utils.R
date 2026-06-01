@@ -256,17 +256,16 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 #' Internal utility function to compute the Uniform Robustness Value (RV)
 #' for sensitivity analysis across multiple time points.
 #'
-#' @param eval.times Numeric vector of times at which robustness values are evaluated.
-#' @param rv Numeric vector of pointwise robustness values at each time.
-#' @param q.01 Estimated lower bound (e.g., 1% survival quantile).
-#' @param q.99 Estimated upper bound (e.g., 99% survival quantile).
+#' @param theta.obs Numeric vector of observed treatment effect estimates.
+#' @param rho Correlation parameter.
+#' @param theta Hypothesized effect value.
 #'
 #' @return Numeric value representing the uniform robustness value.
 #'
 #' @keywords internal
 .get.uniform.RV <- function(theta.obs, psi, tau,
                             IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
-                            rho=1, conf.level=.95, seed=6741){
+                            rho=1, theta=0, conf.level=.95, seed=6741){
   set.seed(seed)
 
   # p-value under observed data
@@ -279,7 +278,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
   # dist.null <- replicate(1e4, sum(abs(rbind(rt(n, df = n - 1)/sqrt(n)) %*% IF.vals.theta.obs)))
 
 
-  test.stat <- n^(1/2)*max(abs(theta.obs))
+  test.stat <- n^(1/2)*max(abs(theta.obs - theta))
   dist.null <- apply(epsilon, 1, function(x) {max(abs(x))})
 
   pvalue <- mean(dist.null > test.stat)
@@ -305,8 +304,8 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 
       dist.null.sens <- apply(cbind(apply(epsilon.l,1,max), apply(-epsilon.u,1,max)),1,max)
 
-      test.stat.sens <- max(n^(1/2)*max((theta.obs-sens.all*(sqrt(psi)*sqrt(tau)))),
-                            n^(1/2)*max(-(theta.obs+sens.all*(sqrt(psi)*sqrt(tau)))))
+      test.stat.sens <- max(n^(1/2)*max((theta.obs-sens.all*(sqrt(psi)*sqrt(tau))-theta)),
+                            n^(1/2)*max(-(theta.obs+sens.all*(sqrt(psi)*sqrt(tau))-theta)))
 
       q_n <- unname(quantile(dist.null.sens, conf.level))
 
@@ -412,6 +411,8 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 #'
 #' @param eval.times Numeric vector of evaluation times.
 #' @param theta.obs Numeric vector of observed treatment effect estimates at evaluation times.
+#' @param rho Correlation parameter.
+#' @param theta Hypothesized effect value.
 #' @param effect.lower Numeric vector of lower bounds at evaluation times.
 #' @param effect.upper Numeric vector of upper bounds at evaluation times.
 #'

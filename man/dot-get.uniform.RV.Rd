@@ -12,17 +12,17 @@
   IF.vals.psi,
   IF.vals.tau,
   rho = 1,
+  theta = 0,
   conf.level = 0.95
 )
 }
 \arguments{
-\item{eval.times}{Numeric vector of times at which robustness values are evaluated.}
+\item{theta.obs}{Numeric vector of observed treatment effect estimates.}
 
-\item{rv}{Numeric vector of pointwise robustness values at each time.}
+\item{rho}{Correlation parameter.}
 
-\item{q.01}{Estimated lower bound (e.g., 1\% survival quantile).}
+\item{theta}{Hypothesized effect value.}
 
-\item{q.99}{Estimated upper bound (e.g., 99\% survival quantile).}
 }
 \value{
 Numeric value representing the uniform robustness value.

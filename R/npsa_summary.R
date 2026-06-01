@@ -1,8 +1,8 @@
-#' Estimate observed components
+#' Report Robustness Values
 #'
 #' @keywords internal
-.report.RV <- function(rv.times, result, rho = 1,
-                       conf.level = .95, unif = TRUE, q.01, q.99) {
+.report.RV <- function(rv.times, result, rho = 1, theta = 0,
+                       conf.level = .95, unif = TRUE, t.lower, t.upper) {
   res.list <- list()
 
   if (any(rv.times > max(result$fit.times))) {
@@ -21,6 +21,7 @@
       IF.vals.psi = result$IF.vals.psi,
       IF.vals.tau = result$IF.vals.tau,
       rho = rho,
+      theta = theta,
       conf.level = conf.level
     )
 
@@ -41,7 +42,7 @@
   out <- list(res.table = res.table)
 
   if (unif){
-    unif.idx <- which(result$fit.times >= q.01 & result$fit.times <= q.99)
+    unif.idx <- which(result$fit.times >= t.lower & result$fit.times <= t.upper)
     unif.RV <- .get.uniform.RV(
       theta.obs = result$obs.comps.df$theta.obs[unif.idx],
       psi = result$obs.comps.df$psi[unif.idx],
@@ -50,6 +51,7 @@
       IF.vals.psi = result$IF.vals.psi[,unif.idx],
       IF.vals.tau = result$IF.vals.tau,
       rho = rho,
+      theta = theta,
       conf.level = conf.level
     )
     out$unif.RV <- unif.RV
@@ -538,4 +540,3 @@ plot.boundsdf <- function(x, ...) {
         ) +
         facet_wrap(~setting, scales = "free_y")
 }
-

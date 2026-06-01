@@ -24,6 +24,10 @@
 \arguments{
 \item{theta.obs}{Numeric vector of observed treatment effect estimates at evaluation times.}
 
+\item{rho}{Correlation parameter.}
+
+\item{theta}{Hypothesized effect value.}
+
 \item{eval.times}{Numeric vector of evaluation times.}
 
 \item{effect.lower}{Numeric vector of lower bounds at evaluation times.}

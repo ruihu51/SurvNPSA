@@ -2,11 +2,20 @@
 % Please edit documentation in R/npsa_summary.R
 \name{.report.RV}
 \alias{.report.RV}
-\title{Estimate observed components}
+\title{Report Robustness Values}
 \usage{
-.report.RV(rv.time, result, conf.level = 0.95, unif = TRUE, q.01, q.99)
+.report.RV(
+  rv.times,
+  result,
+  rho = 1,
+  theta = 0,
+  conf.level = 0.95,
+  unif = TRUE,
+  t.lower,
+  t.upper
+)
 }
 \description{
-Estimate observed components
+Report Robustness Values
 }
 \keyword{internal}

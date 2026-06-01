@@ -18,7 +18,8 @@ Imports:
     survival,
     dplyr,
     ggplot2,
-    cubature
+    cubature,
+    mvtnorm
 Depends: 
     R (>= 3.5),
     survival,

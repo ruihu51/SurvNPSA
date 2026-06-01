@@ -12,7 +12,8 @@
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param target.options List of options for target parameter estimation.
 #' @param bound.options List of options for reporting pointwise and uniform bounds.
-#' @param rv.options List of options for robustness value computation.
+#' @param rv.options List of options for robustness value computation. May include
+#'   \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
@@ -73,6 +74,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     scale <- bound.options$scale
     rv.times <- rv.options$rv.times
     uniform.cutpoint <- rv.options$uniform.cutpoint
+    rho <- rv.options$rho
+    theta <- rv.options$theta
     fit.times.rmst <- rmst.options$fit.times.rmst
     gamma.type <- rmst.options$gamma.type
     max_gap <- rmst.options$max_gap
@@ -173,11 +176,12 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     # Robustness Values computations
     if (!is.null(rv.times)) {
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        q.01 <- quantile(time[event == 1], uniform.cutpoint[1])
-        q.99 <- quantile(time[event == 1], uniform.cutpoint[2])
-        cat(q.01, q.99, "\n")
+        t.lower <- quantile(time[event == 1], uniform.cutpoint[1])
+        t.upper <- quantile(time[event == 1], uniform.cutpoint[2])
+        cat(t.lower, t.upper, "\n")
 
-        out$res.RV <- .report.RV(rv.times, result, unif = TRUE, q.01 = q.01, q.99 = q.99)
+        out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
+                                 unif = TRUE, t.lower = t.lower, t.upper = t.upper)
     }
 
     class(out) <- "npsa_surv"
@@ -195,8 +199,10 @@ npsa_bound.options <- function(plot.times = c(0.5, 0.8, 1.2), transform = TRUE, 
     list(plot.times = plot.times, transform = transform, scale = scale)
 }
 
-npsa_rv.options <- function(rv.times = c(0.3, 0.5, 1.2), uniform.cutpoint = c(0.01, 0.99)) {
-    list(rv.times = rv.times, uniform.cutpoint = uniform.cutpoint)
+npsa_rv.options <- function(rv.times = NULL, uniform.cutpoint = c(0.01, 0.99),
+                            rho = 1, theta = 0) {
+    list(rv.times = rv.times, uniform.cutpoint = uniform.cutpoint,
+         rho = rho, theta = theta)
 }
 
 npsa_rmst.options <- function(fit.times.rmst = c(0.5, 0.7, 2), gamma.type = "hybrid",
@@ -217,5 +223,4 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
     list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df,
          num_drop = num_drop, senspar.save.path = senspar.save.path)
 }
-
 

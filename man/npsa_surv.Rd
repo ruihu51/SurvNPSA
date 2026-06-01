@@ -41,7 +41,8 @@ npsa_surv(
 
 \item{bound.options}{List of options for reporting pointwise and uniform bounds.}
 
-\item{rv.options}{List of options for robustness value computation.}
+\item{rv.options}{List of options for robustness value computation. May include
+\code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.}
 
 \item{rmst}{Logical; if TRUE, estimate RMST and its bounds inference as well.}
 
