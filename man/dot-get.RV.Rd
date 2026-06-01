@@ -28,6 +28,8 @@
 
 \item{theta}{Hypothesized effect value.}
 
+\item{transform}{Logical; whether to use transformed pointwise MIRV calculation.}
+
 \item{eval.times}{Numeric vector of evaluation times.}
 
 \item{effect.lower}{Numeric vector of lower bounds at evaluation times.}

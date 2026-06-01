@@ -424,6 +424,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 #' @param theta.obs Numeric vector of observed treatment effect estimates at evaluation times.
 #' @param rho Correlation parameter.
 #' @param theta Hypothesized effect value.
+#' @param transform Logical; whether to use transformed pointwise MIRV calculation.
 #' @param effect.lower Numeric vector of lower bounds at evaluation times.
 #' @param effect.upper Numeric vector of upper bounds at evaluation times.
 #'
@@ -485,14 +486,14 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 
       if (lower.b) {
           if (transform) {
-              val <- trans.log(pmin(pmax(effect.lower, -1), 1)) - c_alpha / sqrt(n)
+              val <- trans.log(pmin(pmax(effect.lower.sp, -1), 1)) - c_alpha / sqrt(n)
               return(trans.log.inv(val) - theta)
           } else {
               return(effect.lower.sp - c_alpha / sqrt(n) - theta)
           }
       } else {
           if (transform) {
-              val <- trans.log(pmin(pmax(effect.upper, -1), 1)) + c_alpha / sqrt(n)
+              val <- trans.log(pmin(pmax(effect.upper.sp, -1), 1)) + c_alpha / sqrt(n)
               return(trans.log.inv(val) - theta)
           } else {
               return(effect.upper.sp + c_alpha / sqrt(n) - theta)

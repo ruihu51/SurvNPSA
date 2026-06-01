@@ -39,7 +39,8 @@ npsa_surv(
 
 \item{target.options}{List of options for target parameter estimation.}
 
-\item{bound.options}{List of options for reporting pointwise and uniform bounds.}
+\item{bound.options}{List of options for reporting pointwise and uniform bounds.
+The \code{transform} option is also used for pointwise MIRV calculation.}
 
 \item{rv.options}{List of options for robustness value computation. May include
 \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.}

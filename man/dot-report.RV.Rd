@@ -10,10 +10,14 @@
   rho = 1,
   theta = 0,
   conf.level = 0.95,
+  transform = FALSE,
   unif = TRUE,
   t.lower,
   t.upper
 )
+}
+\arguments{
+\item{transform}{Logical; whether to use transformed pointwise MIRV calculation.}
 }
 \description{
 Report Robustness Values

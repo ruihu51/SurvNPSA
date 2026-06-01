@@ -12,6 +12,7 @@
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param target.options List of options for target parameter estimation.
 #' @param bound.options List of options for reporting pointwise and uniform bounds.
+#'   The \code{transform} option is also used for pointwise MIRV calculation.
 #' @param rv.options List of options for robustness value computation. May include
 #'   \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
@@ -181,6 +182,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
         cat(t.lower, t.upper, "\n")
 
         out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
+                                 transform = transform,
                                  unif = TRUE, t.lower = t.lower, t.upper = t.upper)
     }
 
@@ -223,4 +225,3 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
     list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df,
          num_drop = num_drop, senspar.save.path = senspar.save.path)
 }
-

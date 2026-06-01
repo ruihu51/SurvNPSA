@@ -1,8 +1,11 @@
 #' Report Robustness Values
 #'
+#' @param transform Logical; whether to use transformed pointwise MIRV calculation.
+#'
 #' @keywords internal
 .report.RV <- function(rv.times, result, rho = 1, theta = 0,
-                       conf.level = .95, unif = TRUE, t.lower, t.upper) {
+                       conf.level = .95, transform = FALSE,
+                       unif = TRUE, t.lower, t.upper) {
   res.list <- list()
 
   if (any(rv.times > max(result$fit.times))) {
@@ -22,6 +25,7 @@
       IF.vals.tau = result$IF.vals.tau,
       rho = rho,
       theta = theta,
+      transform = transform,
       conf.level = conf.level
     )
 
