@@ -9,8 +9,8 @@
 You can install the development version of **SurvNPSA** from GitHub:
 
 ```r
-# install.packages("devtools")
-devtools::install_github("ruihu51/SurvNPSA")
+# install.packages("pak")
+pak::pak("ruihu51/SurvNPSA")
 ```
 
 ## Codes Structure
@@ -28,4 +28,3 @@ R/
 │   ├── npsa_summary.R
 │   ├── npsa_utils.R
 ```
-
