@@ -504,16 +504,28 @@ summary.interpretRV <- function(object, ...) {
 #' @export
 #' @method plot boundsdf
 plot.boundsdf <- function(x, ...) {
+    if ("ptwise.trans.lower" %in% names(x)) {
+        x$ptwise.lower <- x$ptwise.trans.lower
+        x$ptwise.upper <- x$ptwise.trans.upper
+        x$uniform.lower <- x$uniform.trans.lower
+        x$uniform.upper <- x$uniform.trans.upper
+    } else {
+        x$ptwise.lower <- x$ptwise.bounds.lower
+        x$ptwise.upper <- x$ptwise.bounds.upper
+        x$uniform.lower <- x$uniform.bounds.lower
+        x$uniform.upper <- x$uniform.bounds.upper
+    }
+
     x %>%
         mutate(setting = paste0("Drop ", d, " confounder", ifelse(d > 1, "s", ""))) %>%
         ggplot(aes(x = times)) +
         geom_line(aes(y = theta.obs, linetype = "Observed Effect", color = "Observed Effect")) +
         geom_line(aes(y = effect.lower, linetype = "Effect Bounds", color = "Effect Bounds")) +
         geom_line(aes(y = effect.upper, linetype = "Effect Bounds", color = "Effect Bounds")) +
-        geom_line(aes(y = ptwise.trans.lower, linetype = "Pointwise CI", color = "Pointwise CI")) +
-        geom_line(aes(y = ptwise.trans.upper, linetype = "Pointwise CI", color = "Pointwise CI")) +
-        geom_line(aes(y = uniform.trans.lower, linetype = "Uniform Bands", color = "Uniform Bands")) +
-        geom_line(aes(y = uniform.trans.upper, linetype = "Uniform Bands", color = "Uniform Bands")) +
+        geom_line(aes(y = ptwise.lower, linetype = "Pointwise CI", color = "Pointwise CI")) +
+        geom_line(aes(y = ptwise.upper, linetype = "Pointwise CI", color = "Pointwise CI")) +
+        geom_line(aes(y = uniform.lower, linetype = "Uniform Bands", color = "Uniform Bands")) +
+        geom_line(aes(y = uniform.upper, linetype = "Uniform Bands", color = "Uniform Bands")) +
         scale_color_manual(values = c(
             "Observed Effect" = "black",
             "Effect Bounds" = "red",

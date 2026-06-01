@@ -50,6 +50,16 @@
   sens.out <- effect.bounds$sens.out
   sens.trt <- effect.bounds$sens.trt
 
+  if (length(psi) != length(fit.times)) {
+      stop("The length of `psi` must match the number of effect bound times.")
+  }
+  if (any(!is.finite(psi) | psi <= 0)) {
+      stop("`psi` must contain finite positive values.")
+  }
+  if (length(tau) != 1 || !is.finite(tau) || tau <= 0) {
+      stop("`tau` must be a finite positive value.")
+  }
+
   n <- dim(IF.vals.theta.obs)[1]
 
   # IF for effect bound
@@ -74,6 +84,7 @@
       IF.vals.effect.upper <- IF.vals.effect.upper[row.notna.idx,]
       n <- nrow(IF.vals.effect.lower)
       message(sprintf("NA detected in IF.vals. Removed %d rows with missing values. Now N = %d.", sum(!row.notna.idx), n))
+      if (n == 0) stop("No rows remain after removing missing IF values.")
   }
 
   # pointwise confidence intervals for effect bounds - correlated
