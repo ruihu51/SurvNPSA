@@ -15,9 +15,9 @@
 
 \item{tau}{Truncation parameter.}
 
-\item{sens.out}{Sensitivity parameter for outcome model.}
+\item{sens.out}{Sensitivity parameter for U-T.}
 
-\item{sens.trt}{Sensitivity parameter for treatment model.}
+\item{sens.trt}{Sensitivity parameter for U-A.}
 
 \item{rho}{Correlation parameter.}
 }

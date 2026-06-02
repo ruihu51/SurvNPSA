@@ -9,6 +9,7 @@
   event,
   result,
   fit.times.rmst,
+  eval.times.rmst,
   max_gap = 0.1,
   tol = 0.001,
   tol1 = 0.001,

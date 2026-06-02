@@ -9,6 +9,8 @@
 \arguments{
 \item{object}{An object of class \code{reportRV}.}
 
+\item{digits}{Number of digits for printing.}
+
 \item{...}{Additional arguments (currently unused).}
 }
 \value{

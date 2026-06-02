@@ -18,23 +18,40 @@
   conf.bounds = TRUE,
   transform = FALSE,
   conf.level = 0.95,
-  verbose = TRUE
+  verbose = TRUE,
+  boot = 10000
 )
 }
 \arguments{
-\item{theta.obs}{Numeric vector of observed treatment effect estimates at evaluation times.}
+\item{t0}{Numeric evaluation time.}
+
+\item{fit.times}{Numeric vector of fitted times.}
+
+\item{theta.obs}{Numeric vector of observed treatment effect estimates.}
+
+\item{psi}{Numeric vector of estimated psi values.}
+
+\item{tau}{Numeric estimated tau value.}
+
+\item{IF.vals.theta.obs}{Influence function values for the observed effect.}
+
+\item{IF.vals.psi}{Influence function values for psi.}
+
+\item{IF.vals.tau}{Influence function values for tau.}
 
 \item{rho}{Correlation parameter.}
 
 \item{theta}{Hypothesized effect value.}
 
+\item{conf.bounds}{Logical; if TRUE, compute MIRV using confidence bounds.}
+
 \item{transform}{Logical; whether to use transformed pointwise MIRV calculation.}
 
-\item{eval.times}{Numeric vector of evaluation times.}
+\item{conf.level}{Confidence level.}
 
-\item{effect.lower}{Numeric vector of lower bounds at evaluation times.}
+\item{verbose}{Logical; if TRUE, print the no-sensitivity confidence interval.}
 
-\item{effect.upper}{Numeric vector of upper bounds at evaluation times.}
+\item{boot}{Number of simulations for the pointwise confidence calculation.}
 }
 \value{
 A numeric vector of pointwise robustness values corresponding to each evaluation time.

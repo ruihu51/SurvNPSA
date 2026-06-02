@@ -13,7 +13,9 @@
   IF.vals.tau,
   rho = 1,
   band.end.pts = c(0, Inf),
-  conf.level = 0.95
+  conf.level = 0.95,
+  boot = 10000,
+  scale = TRUE
 )
 }
 \arguments{

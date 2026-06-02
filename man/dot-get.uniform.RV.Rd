@@ -13,7 +13,8 @@
   IF.vals.tau,
   rho = 1,
   theta = 0,
-  conf.level = 0.95
+  conf.level = 0.95,
+  seed = 6741
 )
 }
 \arguments{
@@ -22,7 +23,6 @@
 \item{rho}{Correlation parameter.}
 
 \item{theta}{Hypothesized effect value.}
-
 }
 \value{
 Numeric value representing the uniform robustness value.

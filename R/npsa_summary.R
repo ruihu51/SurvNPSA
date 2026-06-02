@@ -71,6 +71,7 @@
 #' Summary method for objects of class \code{reportRV}.
 #'
 #' @param object An object of class \code{reportRV}.
+#' @param digits Number of digits for printing.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return Printed robustness value results.

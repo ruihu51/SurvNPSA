@@ -13,6 +13,7 @@
   psi,
   tau,
   S.hat.obs,
+  g.hat.obs,
   num_drop = NULL,
   pct_drop = NULL,
   rep = 100,

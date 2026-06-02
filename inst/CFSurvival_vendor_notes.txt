@@ -1,0 +1,65 @@
+CFsurvival vendor notes for SurvNPSA
+====================================
+
+Date: 2026-06-02
+
+Upstream source:
+- GitHub repository: https://github.com/tedwestling/CFsurvival
+- Documentation: https://rdrr.io/github/tedwestling/CFsurvival/
+- Source files consulted:
+  - R/fit_survival.R
+  - R/get_comparisons.R
+
+Purpose:
+- Add no-unobserved-confounding survival reporting to SurvNPSA while preserving
+  Rui's existing nuisance and observed-component pipeline.
+- Do not add CFsurvival as a GitHub dependency.
+- Vendor only the helper logic needed for treatment-specific survival curves,
+  pointwise confidence intervals, uniform confidence bands, isotonized survival
+  behavior, and survival contrasts.
+
+Vendored/adapted helper logic:
+- .surv.confints() from CFsurvival R/fit_survival.R was adapted as
+  .np_surv.confints().
+- .estimate.uniform.quantile() from CFsurvival R/fit_survival.R was adapted as
+  .np_estimate.uniform.quantile().
+- .surv.difference(), .surv.ratio(), .risk.ratio(), and .nnt() from
+  CFsurvival R/get_comparisons.R were adapted as internal .np_* helpers.
+- Treatment-specific survival reporting follows the CFsurvival structure:
+  surv.df with trt, surv, se, pointwise CI columns, equal-width uniform bands,
+  logit/equi-precision uniform bands, and isotonized survival curves.
+
+Intentional local modifications:
+- CFsurvival .surv.ratio() upstream has:
+    df$unif.upper <- exp(df$unif.upper)
+  after computing df$unif.upper.log. SurvNPSA uses:
+    df$unif.upper <- exp(df$unif.upper.log)
+  so the upper uniform survival-ratio band is back-transformed from the
+  computed log-scale upper endpoint.
+- CFsurvival .risk.ratio() upstream has:
+    df$unif.upper <- exp(df$unif.upper)
+  after computing df$unif.upper.log. SurvNPSA uses:
+    df$unif.upper <- exp(df$unif.upper.log)
+  so the upper uniform risk-ratio band is back-transformed from the computed
+  log-scale upper endpoint.
+- CFsurvival contrast helpers store simulation draws by reading
+  unif.info$sim.maxes, while the upstream .estimate.uniform.quantile() returns
+  a field named maxes. SurvNPSA stores unif.info$maxes so the simulation draws
+  are preserved when returned.
+- CFsurvival contrast helpers mask uniform bands using logical indices based on
+  fit.times even though the data frames include an added time-zero row. SurvNPSA
+  masks using the data-frame time column so the logical index length matches the
+  output rows.
+- SurvNPSA uses np_surv.options()$uniform.cutpoint to choose the uniform-band
+  and no-effect-test time window. This keeps the default close to CFsurvival's
+  0.01 lower-window behavior while exposing the window to users.
+- SurvNPSA creates stable uniform-band columns filled with NA when
+  conf.band = FALSE, so user-facing output has the same column names whether or
+  not bands are requested.
+
+Not modified:
+- Rui's existing .get.nuisances.est() and nuisance options are not replaced.
+- Rui's observed-component formulas in .get.obs.comps() are not changed.
+- SurvNPSA's existing no-confounding uniform test statistic is preserved for
+  np_surv()$uniform.test.
+

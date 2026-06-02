@@ -22,7 +22,6 @@
 #'   a custom path.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
 #' @param var_names Character vector of confounder variable names.
-#' @param plot Logical; if TRUE, automatically plot bounds after estimation.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.
 #' @param save Logical; if TRUE, save intermediate results.
 #'

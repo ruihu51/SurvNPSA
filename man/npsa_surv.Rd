@@ -19,7 +19,6 @@ npsa_surv(
   sens.options = list(),
   result = NULL,
   var_names = NULL,
-  plot = TRUE,
   verbose = FALSE,
   save = FALSE
 )
@@ -56,8 +55,6 @@ a custom path.}
 \item{result}{Optional precomputed result object (e.g., containing nuisances).}
 
 \item{var_names}{Character vector of confounder variable names.}
-
-\item{plot}{Logical; if TRUE, automatically plot bounds after estimation.}
 
 \item{verbose}{Logical; if TRUE, print system timestamps for each estimation step.}
 

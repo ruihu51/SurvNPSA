@@ -420,13 +420,21 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 #' Internal utility function to compute the Pointwise Robustness Value (RV)
 #' for sensitivity analysis at specific evaluation times.
 #'
-#' @param eval.times Numeric vector of evaluation times.
-#' @param theta.obs Numeric vector of observed treatment effect estimates at evaluation times.
+#' @param t0 Numeric evaluation time.
+#' @param fit.times Numeric vector of fitted times.
+#' @param theta.obs Numeric vector of observed treatment effect estimates.
+#' @param psi Numeric vector of estimated psi values.
+#' @param tau Numeric estimated tau value.
+#' @param IF.vals.theta.obs Influence function values for the observed effect.
+#' @param IF.vals.psi Influence function values for psi.
+#' @param IF.vals.tau Influence function values for tau.
 #' @param rho Correlation parameter.
 #' @param theta Hypothesized effect value.
+#' @param conf.bounds Logical; if TRUE, compute MIRV using confidence bounds.
 #' @param transform Logical; whether to use transformed pointwise MIRV calculation.
-#' @param effect.lower Numeric vector of lower bounds at evaluation times.
-#' @param effect.upper Numeric vector of upper bounds at evaluation times.
+#' @param conf.level Confidence level.
+#' @param verbose Logical; if TRUE, print the no-sensitivity confidence interval.
+#' @param boot Number of simulations for the pointwise confidence calculation.
 #'
 #' @return A numeric vector of pointwise robustness values corresponding to each evaluation time.
 #'

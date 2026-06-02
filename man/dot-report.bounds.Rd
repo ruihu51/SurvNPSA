@@ -7,12 +7,18 @@
 .report.bounds(
   plot.times,
   result,
+  rho = 1,
+  band.end.pts = c(0, Inf),
+  conf.level = 0.95,
+  boot = 10000,
   sens.df.mean = NULL,
   num_drop = NULL,
   pct_drop = NULL,
   n_var = NULL,
   rmst = TRUE,
-  sens.rmst.df.mean = NULL
+  sens.rmst.df.mean = NULL,
+  transform = TRUE,
+  scale = TRUE
 )
 }
 \description{

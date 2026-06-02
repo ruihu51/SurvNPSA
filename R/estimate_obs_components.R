@@ -32,6 +32,8 @@
                             G.hats=result$nuisance$cens.pred.1,
                             g.hats=result$nuisance$prop.pred)
     result$IF.vals.1 <- surv.1$IF.vals
+    result$surv.0 <- surv.0
+    result$surv.1 <- surv.1
 
     result$obs.comps.df <- data.frame(time=fit.times,
                                       theta.obs=surv.1$surv - surv.0$surv,
@@ -191,6 +193,5 @@
     return(res)
 
 }
-
 
 
