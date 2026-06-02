@@ -96,11 +96,58 @@ summary.reportRV <- function(object, digits = 3, ...) {
   }
 }
 
-#' Estimate observed components
+#' Interpret Robustness Values
+#'
+#' @param object An object returned by \code{npsa_surv()}.
+#' @param t0 Time point for pointwise RV or MIRV interpretation.
+#' @param type Which robustness value to interpret. Use \code{"RV"},
+#'   \code{"MIRV"}, or \code{"URV"}.
+#' @param var_names Optional confounder names. If \code{NULL}, names stored in
+#'   \code{object} are used.
+#'
+#' @return An object of class \code{interpretRV}.
+#'
+#' @export
+interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
+                         var_names = NULL) {
+    type <- match.arg(type)
+
+    if (!inherits(object, "npsa_surv")) {
+        stop("`object` must be an object returned by `npsa_surv()`.")
+    }
+    if (is.null(object$res.RV)) {
+        stop("`object` does not contain RV results. Please run `npsa_surv()` with `rv.options$rv.times`.")
+    }
+    if (is.null(object$senspar.df$sens.df) || is.null(object$senspar.df$sens.df.mean)) {
+        stop("`object` does not contain sensitivity parameter results for RV interpretation.")
+    }
+
+    if (is.null(var_names)) var_names <- object$var_names
+    if (is.null(var_names)) {
+        stop("Please provide `var_names`, or run `npsa_surv()` with confounder names.")
+    }
+
+    if (type == "URV") {
+        return(.interpret.URV(object$result$fit.times, object$res.RV,
+                              object$senspar.df$sens.df,
+                              object$senspar.df$sens.df.mean,
+                              var_names))
+    }
+
+    if (is.null(t0)) stop("Please provide `t0` for RV or MIRV interpretation.")
+
+    .interpret.RV(t0 = t0, res.RV = object$res.RV,
+                  sens.df = object$senspar.df$sens.df,
+                  sens.df.mean = object$senspar.df$sens.df.mean,
+                  var_names = var_names, type = type)
+}
+
+#' Interpret Pointwise Robustness Values
 #'
 #' @keywords internal
 .interpret.RV <- function(t0, res.RV, sens.df, sens.df.mean, var_names,
                           type = c("RV", "MIRV")) {
+    type <- match.arg(type)
 
     res.table <- res.RV$res.table
 
@@ -109,82 +156,49 @@ summary.reportRV <- function(object, digits = 3, ...) {
     }
 
     n_var <- length(var_names)
-    out.1 <- out.d <- out.half <- NULL
+    rv <- res.table[res.table$t0 == t0, type]
+    rv <- as.numeric(rv[1])
 
-
-    if ("RV" %in% type) {
-        rv <- res.table[res.table$t0 == t0, "RV"]
-        sp.point <- rv^2 / (1 - rv)
-
-        # leave-1-out
-        out <- sens.df %>%
-            mutate(sens.par = C.Y.sq * C.A.sq, confounder = var_names[j]) %>%
-            filter(near(t, t0) & d == 1, sens.par > sp.point)
-
-        out.1 <- if (nrow(out) == 0) NULL else out$confounder
-
-        # leave-d-out
-        out <- sens.df.mean %>%
-            filter(near(t, t0)) %>%
-            arrange(d) %>%
-            mutate(sig.point = sens.par > sp.point)
-
-        change.idx <- which(diff(out$sig.point) == 1)
-        out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
-
-        # leave-half-out
-        half_d <- ceiling(n_var * 0.5)
-        # cat(half_d, "\n")
-
-        out <- mean(
-            sens.df %>%
-                mutate(sens.par = C.Y.sq * C.A.sq) %>%
-                filter(near(t, t0) & d == half_d) %>%
-                mutate(value = sens.par <= sp.point) %>%
-                pull(value)
-        )
-
-        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
-            NULL
-        } else {
-            out
-        }
+    if (is.na(rv)) {
+        stop(sprintf("No %s result is available at time t0.", type))
     }
 
-    if ("MIRV" %in% type) {
-        rv <- res.table[res.table$t0 == t0, "MIRV"]
-        sp.pw <- rv^2 / (1 - rv)
-        # print(sp.pw)
+    sp.point <- rv^2 / (1 - rv)
+    half_d <- ceiling(n_var * 0.5)
 
-        out <- sens.df %>%
-            mutate(sens.par = C.Y.sq * C.A.sq, confounder = var_names[j]) %>%
-            filter(near(t, t0) & d == 1, sens.par > sp.pw)
+    sens.t0 <- sens.df %>%
+        mutate(sens.par = C.Y.sq * C.A.sq,
+               confounder = var_names[j]) %>%
+        filter(near(t, t0))
 
-        out.1 <- if (nrow(out) == 0) NULL else out$confounder
+    sens.mean.t0 <- sens.df.mean %>%
+        filter(near(t, t0)) %>%
+        arrange(d) %>%
+        mutate(sig.point = sens.par > sp.point)
 
-        out <- sens.df.mean %>%
-            filter(near(t, t0)) %>%
-            arrange(d) %>%
-            mutate(sig.point = sens.par > sp.pw)
+    out.1 <- sens.t0 %>%
+        filter(d == 1, sens.par > sp.point) %>%
+        pull(confounder)
+    out.1 <- if (length(out.1) == 0) NULL else out.1
 
-        change.idx <- which(diff(out$sig.point) == 1)
-        out.d <- if (length(change.idx) > 0) c(out$d[change.idx], out$d[change.idx + 1]) else NULL
+    change.idx <- which(diff(sens.mean.t0$sig.point) == 1)
+    out.d <- if (length(change.idx) > 0) {
+        c(sens.mean.t0$d[change.idx], sens.mean.t0$d[change.idx + 1])
+    } else {
+        NULL
+    }
 
-        half_d <- ceiling(n_var * 0.5)
+    out <- mean(
+        sens.t0 %>%
+            filter(d == half_d) %>%
+            mutate(value = sens.par <= sp.point) %>%
+            pull(value)
+    )
 
-        out <- mean(
-            sens.df %>%
-                mutate(sens.par = C.Y.sq * C.A.sq) %>%
-                filter(near(t, t0) & d == half_d) %>%
-                mutate(value = sens.par <= sp.pw) %>%
-                pull(value)
-        )
-
-        out.half <- if (!is.null(out) && !is.na(out) && out == 1) {
-            NULL
-        } else {
-            out
-        }
+    out.half <- if (is.na(out) || out == 1) {
+        NULL
+    } else {
+        out
     }
 
     # ------ FINAL summary output --------
@@ -202,7 +216,11 @@ summary.reportRV <- function(object, digits = 3, ...) {
 
     out <- list(
         title = title_line,
-        table = summary_table
+        table = summary_table,
+        type = type,
+        t0 = t0,
+        rv = rv,
+        sens.par = sp.point
     )
     class(out) <- "interpretRV"
     return(out)

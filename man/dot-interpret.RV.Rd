@@ -2,7 +2,7 @@
 % Please edit documentation in R/npsa_summary.R
 \name{.interpret.RV}
 \alias{.interpret.RV}
-\title{Estimate observed components}
+\title{Interpret Pointwise Robustness Values}
 \usage{
 .interpret.RV(
   t0,
@@ -10,10 +10,10 @@
   sens.df,
   sens.df.mean,
   var_names,
-  type = c("RV", "MIRV", "URV")
+  type = c("RV", "MIRV")
 )
 }
 \description{
-Estimate observed components
+Interpret Pointwise Robustness Values
 }
 \keyword{internal}

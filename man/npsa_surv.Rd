@@ -70,6 +70,7 @@ A list of class \code{npsa_surv} containing:
 \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 \item{res.RV}{Robustness values at specified times (if \code{rv.times} is given).}
+\item{var_names}{Confounder names used by interpretation helpers.}
 }
 }
 \description{

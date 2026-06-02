@@ -32,6 +32,7 @@
 #'   \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 #'   \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 #'   \item{res.RV}{Robustness values at specified times (if \code{rv.times} is given).}
+#'   \item{var_names}{Confounder names used by interpretation helpers.}
 #' }
 #'
 #' @examples
@@ -90,6 +91,13 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     senspar.save.path <- sens.options$senspar.save.path
 
     n_var <- ncol(confounders)
+    if (is.null(var_names)) {
+        var_names <- colnames(confounders)
+        if (is.null(var_names)) var_names <- paste0("W", seq_len(n_var))
+    }
+    if (length(var_names) != n_var) {
+        stop("`var_names` must have one name for each confounder.")
+    }
 
     # Nuisance Estimation
     if (verbose) cat("Start estimating nuisances:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -172,7 +180,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     #     plot(bounds.df$bounds.df)
     # }
 
-    out <- list(result = result, senspar.df = senspar.df, bounds.df = bounds.df)
+    out <- list(result = result, senspar.df = senspar.df, bounds.df = bounds.df,
+                var_names = var_names)
 
     # Robustness Values computations
     if (!is.null(rv.times)) {

@@ -3,4 +3,5 @@
 S3method(plot,boundsdf)
 S3method(summary,interpretRV)
 S3method(summary,reportRV)
+export(interpret.RV)
 export(npsa_surv)
