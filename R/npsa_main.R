@@ -201,6 +201,225 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
 
 
+
+
+#' No-Unobserved-Confounding Survival Analysis
+#'
+#' Estimate the adjusted survival results under no unobserved confounding.
+#' This user-facing wrapper reuses the same nuisance and observed-component
+#' pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
+#' survival curves and common CFsurvival-style contrasts.
+#'
+#' @param time Numeric vector of event or censoring times.
+#' @param event Numeric vector of event indicators (1 = event, 0 = censored).
+#' @param treat Numeric vector of treatment assignment indicators (1 = treated, 0 = control).
+#' @param confounders Matrix or data frame of observed confounders.
+#' @param fit.times Numeric vector of times for survival estimation.
+#' @param nuisance.options List of options for nuisance estimation.
+#' @param target.options List of options for target parameter estimation.
+#' @param np.options List of options from \code{\link{np_surv.options}()}.
+#' @param rmst Logical; if TRUE, estimate RMST using the existing SurvNPSA RMST pipeline.
+#' @param rmst.options List of options for RMST estimation.
+#' @param result Optional precomputed result object containing nuisances or observed components.
+#' @param var_names Character vector of confounder variable names.
+#' @param verbose Logical; if TRUE, print progress messages.
+#' @param save Logical; if TRUE, save intermediate result to \code{dev/result.RData}.
+#'
+#' @return A list of class \code{npSurv}.
+#'
+#' @export
+np_surv <- function(time, event, treat, confounders, fit.times,
+                    nuisance.options = list(),
+                    target.options = list(),
+                    np.options = list(),
+                    rmst = FALSE,
+                    rmst.options = list(),
+                    result = NULL,
+                    var_names = NULL,
+                    verbose = FALSE,
+                    save = FALSE) {
+
+    # Update control parameters
+    target.options <- do.call(npsa_target.options, target.options)
+    np.options <- do.call(np_surv.options, np.options)
+    rmst.options <- do.call(npsa_rmst.options, rmst.options)
+
+    # Extract options
+    psi.type <- target.options$psi.type
+    plot.times <- np.options$plot.times
+    conf.band <- np.options$conf.band
+    conf.level <- np.options$conf.level
+    contrasts <- np.options$contrasts
+    uniform.cutpoint <- np.options$uniform.cutpoint
+    isotonize <- np.options$isotonize
+    seed <- np.options$seed
+    fit.times.rmst <- rmst.options$fit.times.rmst
+    gamma.type <- rmst.options$gamma.type
+    max_gap <- rmst.options$max_gap
+    tol <- rmst.options$tol
+    tol1 <- rmst.options$tol1
+    tol2 <- rmst.options$tol2
+
+    n_var <- ncol(confounders)
+    if (is.null(var_names)) {
+        var_names <- colnames(confounders)
+        if (is.null(var_names)) var_names <- paste0("W", seq_len(n_var))
+    }
+    if (length(var_names) != n_var) {
+        stop("`var_names` must have one name for each confounder.")
+    }
+    if (!is.null(seed)) {
+        has.seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+        if (has.seed) old.seed <- get(".Random.seed", envir = .GlobalEnv)
+        on.exit({
+            if (has.seed) {
+                assign(".Random.seed", old.seed, envir = .GlobalEnv)
+            } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+                rm(".Random.seed", envir = .GlobalEnv)
+            }
+        }, add = TRUE)
+        set.seed(seed)
+    }
+
+    # Nuisance Estimation
+    if (verbose) cat("Start estimating nuisances:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    if (is.null(result) || is.null(result$nuisance)) {
+        result <- .get.nuisances.est(time, event, treat, confounders, fit.times,
+                                     nuisance.options = nuisance.options, verbose = verbose)
+        if (save) save(result, file = "dev/result.RData")
+    }
+
+    # Observed Components Estimation
+    if (verbose) cat("Start estimating no-unobserved-confounding survival:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    if (is.null(result$obs.comps.df)) {
+        result <- .get.obs.comps(time, event, treat, result, psi.type = psi.type, verbose = verbose)
+        if (save) save(result, file = "dev/result.RData")
+    }
+
+    # RMST Estimation if requested
+    if (rmst) {
+        if (is.null(fit.times.rmst)) stop("Must specify 'fit.times.rmst' when rmst = TRUE.")
+        if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        if (is.null(result$rmst.obs)) {
+            eval.times.rmst <- result$fit.times
+            result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
+                                          max_gap, tol, tol1, tol2,
+                                          gamma.type, verbose = verbose)
+            if (save) save(result, file = "dev/result.RData")
+        }
+    }
+
+    if (is.null(plot.times)) plot.times <- result$fit.times
+    plot.times <- plot.times[plot.times >= min(result$fit.times) &
+                                 plot.times <= max(result$fit.times)]
+    if (length(plot.times) == 0) stop("No `plot.times` remain within the fitted time range.")
+
+    # Treatment-specific survival and survival contrasts
+    cf.out <- .np_report_cf_surv(time, event, treat, result,
+                                 conf.band = conf.band,
+                                 conf.level = conf.level,
+                                 contrasts = contrasts,
+                                 uniform.cutpoint = uniform.cutpoint,
+                                 isotonize = isotonize)
+
+    # Observed bounds when d = 0
+    bounds.df <- .report.bounds(plot.times, result, rmst = rmst,
+                                transform = TRUE, scale = TRUE)
+
+    # Uniform test for no observed survival difference
+    uniform.test <- .np_uniform_test(result, time, event,
+                                    uniform.cutpoint = uniform.cutpoint,
+                                    conf.level = conf.level)
+
+    ci.summary <- .np_ci_summary(cf.out$surv.diff.df, plot.times)
+
+    out <- c(list(result = result,
+                  bounds.df = bounds.df,
+                  uniform.test = uniform.test,
+                  ci.summary = ci.summary,
+                  plot.times = plot.times,
+                  var_names = var_names,
+                  options = list(target.options = target.options,
+                                 np.options = np.options,
+                                 rmst = rmst,
+                                 rmst.options = rmst.options)),
+             cf.out)
+
+    class(out) <- "npSurv"
+    if (verbose) cat("Finished:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    return(out)
+}
+
+#' Options for \code{np_surv()}
+#'
+#' @param plot.times Optional numeric vector of times to summarize and plot.
+#' @param conf.band Logical; if TRUE, compute uniform confidence bands.
+#' @param conf.level Desired confidence level.
+#' @param contrasts Character vector of contrasts to report. Options are
+#'   \code{"surv.diff"}, \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.
+#' @param uniform.cutpoint Two probabilities used to choose the time window for
+#'   the no-confounding uniform test and CF-style uniform bands.
+#' @param isotonize Logical; if TRUE, apply isotonization to treatment-specific
+#'   survival curves and survival bands.
+#' @param seed Optional integer seed for reproducible uniform bands and uniform
+#'   test p-values. Use \code{NULL} to leave the random seed unchanged.
+#'
+#' @return A named list of options.
+#'
+#' @export
+np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.95,
+                            contrasts = c("surv.diff", "surv.ratio", "risk.ratio", "nnt"),
+                            uniform.cutpoint = c(0.01, 0.99), isotonize = TRUE,
+                            seed = NULL) {
+    if (!is.null(plot.times) &&
+        (!is.numeric(plot.times) || any(!is.finite(plot.times)) || any(plot.times < 0))) {
+        stop("`plot.times` must be NULL or a non-negative numeric vector.")
+    }
+    if (length(conf.band) != 1 || !is.logical(conf.band) || is.na(conf.band)) {
+        stop("`conf.band` must be TRUE or FALSE.")
+    }
+    if (length(conf.level) != 1 || !is.numeric(conf.level) ||
+        !is.finite(conf.level) || conf.level <= 0 || conf.level >= 1) {
+        stop("`conf.level` must be a number between 0 and 1.")
+    }
+    if (length(uniform.cutpoint) != 2 || !is.numeric(uniform.cutpoint) ||
+        any(!is.finite(uniform.cutpoint)) ||
+        any(uniform.cutpoint <= 0 | uniform.cutpoint >= 1) ||
+        uniform.cutpoint[1] >= uniform.cutpoint[2]) {
+        stop("`uniform.cutpoint` must contain two increasing numbers between 0 and 1.")
+    }
+    if (length(isotonize) != 1 || !is.logical(isotonize) || is.na(isotonize)) {
+        stop("`isotonize` must be TRUE or FALSE.")
+    }
+    if (!is.null(seed)) {
+        if (!is.numeric(seed) || length(seed) != 1 || !is.finite(seed) ||
+            seed < 0 || seed > .Machine$integer.max || seed != floor(seed)) {
+            stop("`seed` must be NULL or a single non-negative integer.")
+        }
+        seed <- as.integer(seed)
+    }
+
+    allowed <- c("surv.diff", "surv.ratio", "risk.ratio", "nnt")
+    if (is.null(contrasts)) {
+        contrasts <- character(0)
+    } else {
+        contrasts <- unique(tolower(contrasts))
+        invalid <- setdiff(contrasts, allowed)
+        if (length(invalid) > 0) {
+            stop("Invalid contrast(s): ", paste(invalid, collapse = ", "), ".")
+        }
+    }
+    contrasts <- unique(c("surv.diff", contrasts))
+
+    list(plot.times = plot.times,
+         conf.band = conf.band,
+         conf.level = conf.level,
+         contrasts = contrasts,
+         uniform.cutpoint = uniform.cutpoint,
+         isotonize = isotonize,
+         seed = seed)
+}
+
 npsa_target.options <- function(psi.type = "hybrid") {
     list(psi.type = psi.type)
 }

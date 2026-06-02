@@ -295,3 +295,166 @@
     }
     return(res)
 }
+
+.np_report_cf_surv <- function(time, event, treat, result, conf.band=TRUE,
+                               conf.level=.95, contrasts=c("surv.diff", "surv.ratio"),
+                               uniform.cutpoint=c(0.01, 0.99), isotonize=TRUE) {
+    fit.times <- result$fit.times
+    surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = isotonize)
+    surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = isotonize)
+
+    band.end.pts.0 <- .np_band_endpts(time[event == 1 & treat == 0], uniform.cutpoint, fit.times)
+    band.end.pts.1 <- .np_band_endpts(time[event == 1 & treat == 1], uniform.cutpoint, fit.times)
+    band.end.pts <- .np_band_endpts(time[event == 1], uniform.cutpoint, fit.times)
+
+    surv.df.0 <- .np_surv_df_one(fit.times, surv.0, trt = 0, conf.band = conf.band,
+                                 band.end.pts = band.end.pts.0,
+                                 conf.level = conf.level,
+                                 isotonize = isotonize)
+    surv.df.1 <- .np_surv_df_one(fit.times, surv.1, trt = 1, conf.band = conf.band,
+                                 band.end.pts = band.end.pts.1,
+                                 conf.level = conf.level,
+                                 isotonize = isotonize)
+
+    out <- list(surv.df = rbind(surv.df.0$surv.df, surv.df.1$surv.df),
+                surv.0.unif.ew.quant = surv.df.0$unif.ew.quant,
+                surv.0.unif.logit.quant = surv.df.0$unif.logit.quant,
+                surv.1.unif.ew.quant = surv.df.1$unif.ew.quant,
+                surv.1.unif.logit.quant = surv.df.1$unif.logit.quant)
+
+    if ("surv.diff" %in% contrasts) {
+        out <- c(out, .np_surv.difference(fit.times = fit.times,
+                                          surv.0 = surv.0$surv,
+                                          surv.1 = surv.1$surv,
+                                          IF.vals.0 = surv.0$IF.vals,
+                                          IF.vals.1 = surv.1$IF.vals,
+                                          conf.band = conf.band,
+                                          band.end.pts = band.end.pts,
+                                          conf.level = conf.level))
+    }
+    if ("surv.ratio" %in% contrasts) {
+        out <- c(out, .np_surv.ratio(fit.times = fit.times,
+                                     surv.0 = surv.0$surv,
+                                     surv.1 = surv.1$surv,
+                                     IF.vals.0 = surv.0$IF.vals,
+                                     IF.vals.1 = surv.1$IF.vals,
+                                     conf.band = conf.band,
+                                     band.end.pts = band.end.pts,
+                                     conf.level = conf.level))
+    }
+    if ("risk.ratio" %in% contrasts) {
+        out <- c(out, .np_risk.ratio(fit.times = fit.times,
+                                     surv.0 = surv.0$surv,
+                                     surv.1 = surv.1$surv,
+                                     IF.vals.0 = surv.0$IF.vals,
+                                     IF.vals.1 = surv.1$IF.vals,
+                                     conf.band = conf.band,
+                                     band.end.pts = band.end.pts,
+                                     conf.level = conf.level))
+    }
+    if ("nnt" %in% contrasts) {
+        out <- c(out, .np_nnt(fit.times = fit.times,
+                              surv.0 = surv.0$surv,
+                              surv.1 = surv.1$surv,
+                              IF.vals.0 = surv.0$IF.vals,
+                              IF.vals.1 = surv.1$IF.vals,
+                              conf.band = conf.band,
+                              band.end.pts = band.end.pts,
+                              conf.level = conf.level))
+    }
+
+    out$band.end.pts <- band.end.pts
+    return(out)
+}
+
+.np_get_surv_object <- function(result, trt, isotonize=TRUE) {
+    surv.name <- paste0("surv.", trt)
+    if (!is.null(result[[surv.name]]) && !is.null(result[[surv.name]]$surv)) {
+        surv <- result[[surv.name]]
+    } else {
+        surv <- list(times = result$fit.times,
+                     surv = result$obs.comps.df[[surv.name]],
+                     IF.vals = result[[paste0("IF.vals.", trt)]])
+    }
+
+    if (isotonize) {
+        surv$surv.iso <- NA
+        surv$surv.iso[!is.na(surv$surv)] <-
+            1 - stats::isoreg(surv$times[!is.na(surv$surv)], 1-surv$surv[!is.na(surv$surv)])$yf
+    } else {
+        surv$surv.iso <- surv$surv
+    }
+    return(surv)
+}
+
+.np_surv_df_one <- function(fit.times, surv, trt, conf.band=TRUE,
+                            band.end.pts=c(0, Inf), conf.level=.95, isotonize=TRUE) {
+    c.int <- .np_surv.confints(fit.times, surv$surv, surv$IF.vals,
+                               conf.band = conf.band,
+                               band.end.pts = band.end.pts,
+                               conf.level = conf.level,
+                               isotonize = isotonize)
+    surv.df <- data.frame(time = c(0, fit.times),
+                          trt = trt,
+                          surv = c(1, surv$surv.iso))
+    surv.df$se <- c(0, c.int$res$se)
+    surv.df$se.logit <- c(0, c.int$res$se.logit)
+    surv.df$ptwise.lower <- c(1, c.int$res$ptwise.lower)
+    surv.df$ptwise.upper <- c(1, c.int$res$ptwise.upper)
+    surv.df$ptwise.logit.lower <- c(1, c.int$res$ptwise.logit.lower)
+    surv.df$ptwise.logit.upper <- c(1, c.int$res$ptwise.logit.upper)
+    surv.df$unif.ew.lower <- c(1, c.int$res$unif.ew.lower)
+    surv.df$unif.ew.upper <- c(1, c.int$res$unif.ew.upper)
+    surv.df$unif.logit.lower <- c(1, c.int$res$unif.logit.lower)
+    surv.df$unif.logit.upper <- c(1, c.int$res$unif.logit.upper)
+
+    return(list(surv.df = surv.df,
+                unif.ew.quant = c.int$unif.ew.quant,
+                unif.logit.quant = c.int$unif.logit.quant))
+}
+
+.np_band_endpts <- function(event.times, uniform.cutpoint, fit.times) {
+    event.times <- event.times[is.finite(event.times)]
+    if (length(event.times) == 0) return(c(min(fit.times), max(fit.times)))
+    out <- as.numeric(stats::quantile(event.times, uniform.cutpoint, na.rm = TRUE))
+    out[1] <- max(out[1], min(fit.times))
+    out[2] <- min(out[2], max(fit.times))
+    if (out[1] >= out[2]) out <- c(min(fit.times), max(fit.times))
+    return(out)
+}
+
+.np_uniform_test <- function(result, time, event, uniform.cutpoint=c(0.01, 0.99),
+                             conf.level=.95, theta=0) {
+    band.end.pts <- .np_band_endpts(time[event == 1], uniform.cutpoint, result$fit.times)
+    unif.idx <- which(result$fit.times >= band.end.pts[1] & result$fit.times <= band.end.pts[2])
+    if (length(unif.idx) == 0) {
+        return(data.frame(t.lower = band.end.pts[1], t.upper = band.end.pts[2],
+                          n.time = 0, theta = theta, p.value = NA,
+                          reject.no.effect = NA))
+    }
+
+    theta.obs <- result$obs.comps.df$theta.obs[unif.idx]
+    IF.vals.theta.obs <- result$IF.vals.theta.obs[,unif.idx, drop = FALSE]
+    n <- nrow(IF.vals.theta.obs)
+    epsilon <- .estimate.limit.dist(IF.vals = IF.vals.theta.obs)
+    test.stat <- sqrt(n) * max(abs(theta.obs - theta))
+    dist.null <- apply(epsilon, 1, function(x) max(abs(x)))
+    pvalue <- mean(dist.null > test.stat)
+
+    data.frame(t.lower = band.end.pts[1],
+               t.upper = band.end.pts[2],
+               n.time = length(unif.idx),
+               theta = theta,
+               test.stat = test.stat,
+               p.value = pvalue,
+               reject.no.effect = pvalue < 1 - conf.level)
+}
+
+.np_ci_summary <- function(surv.diff.df, plot.times) {
+    idx <- sapply(plot.times, function(x) which.min(abs(surv.diff.df$time - x)))
+    idx <- unique(idx)
+    out <- surv.diff.df[idx, c("time", "surv.diff", "ptwise.lower", "ptwise.upper", "ptwise.pval")]
+    out$ci.includes.0 <- out$ptwise.lower <= 0 & out$ptwise.upper >= 0
+    rownames(out) <- NULL
+    return(out)
+}

@@ -329,6 +329,181 @@ summary.interpretRV <- function(object, ...) {
     invisible(object)
 }
 
+
+
+#' Summarize No-Unobserved-Confounding Survival Results
+#'
+#' @param object An object returned by \code{\link{np_surv}()}.
+#' @param digits Number of digits for printing.
+#' @param ... Additional arguments.
+#'
+#' @return Invisibly returns \code{object}.
+#'
+#' @export
+#' @method summary npSurv
+summary.npSurv <- function(object, digits = 3, ...) {
+    cat("No-Unobserved-Confounding Survival Report\n")
+    cat("-----------------------------------------\n")
+    cat("\nSurvival difference summary:\n")
+    tbl <- object$ci.summary
+    num.cols <- sapply(tbl, is.numeric)
+    tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
+    print(tbl, row.names = FALSE)
+
+    if (!is.null(object$uniform.test)) {
+        cat("\nUniform no-effect test:\n")
+        tbl <- object$uniform.test
+        num.cols <- sapply(tbl, is.numeric)
+        tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
+        print(tbl, row.names = FALSE)
+    }
+    invisible(object)
+}
+
+#' Plot No-Unobserved-Confounding Survival Results
+#'
+#' @param x An object returned by \code{\link{np_surv}()}.
+#' @param type Plot type. Options are \code{"surv"}, \code{"surv.diff"},
+#'   \code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"}, and \code{"bounds"}.
+#' @param band Band type for treatment-specific survival curves.
+#' @param ... Additional arguments.
+#'
+#' @return A \code{ggplot} object.
+#'
+#' @export
+#' @method plot npSurv
+plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.ratio", "nnt", "bounds"),
+                        band = c("logit", "equal-width", "pointwise", "none"), ...) {
+    type <- match.arg(type)
+    band <- match.arg(band)
+
+    if (type == "surv") {
+        return(.plot.np_surv_curves(x$surv.df, band = band))
+    }
+    if (type == "bounds") {
+        return(.plot.np_bounds(x$bounds.df$bounds.df))
+    }
+    return(.plot.np_contrast(x, type = type))
+}
+
+.plot.np_surv_curves <- function(df, band = "logit") {
+    lower <- upper <- NULL
+    if (band == "logit") {
+        lower <- "unif.logit.lower"
+        upper <- "unif.logit.upper"
+    } else if (band == "equal-width") {
+        lower <- "unif.ew.lower"
+        upper <- "unif.ew.upper"
+    } else if (band == "pointwise") {
+        lower <- "ptwise.lower"
+        upper <- "ptwise.upper"
+    }
+
+    p <- ggplot(df, aes(x = time, y = surv, color = as.factor(trt), group = trt)) +
+        geom_step() +
+        scale_color_manual(values = c("0" = "#0072B2", "1" = "#D55E00"),
+                           labels = c("0" = "Control", "1" = "Treatment")) +
+        labs(color = "Treatment") +
+        xlab("Time") +
+        ylab("Treatment-specific survival") +
+        coord_cartesian(ylim = c(0, 1)) +
+        theme_bw() +
+        theme(legend.position = "bottom",
+              legend.title = element_blank(),
+              panel.grid.minor = element_blank())
+
+    if (!is.null(lower) && lower %in% names(df) && upper %in% names(df)) {
+        df$band.lower <- df[[lower]]
+        df$band.upper <- df[[upper]]
+        p <- p +
+            geom_step(aes(y = band.lower), linetype = "dashed", na.rm = TRUE) +
+            geom_step(aes(y = band.upper), linetype = "dashed", na.rm = TRUE)
+    }
+    return(p)
+}
+
+.plot.np_contrast <- function(x, type) {
+    map <- list(
+        "surv.diff" = list(df = x$surv.diff.df, est = "surv.diff",
+                           ylab = "Survival difference (treatment - control)", ref = 0),
+        "surv.ratio" = list(df = x$surv.ratio.df, est = "surv.ratio",
+                            ylab = "Survival ratio (treatment / control)", ref = 1),
+        "risk.ratio" = list(df = x$risk.ratio.df, est = "risk.ratio",
+                            ylab = "Risk ratio (treatment / control)", ref = 1),
+        "nnt" = list(df = x$nnt.df, est = "nnt",
+                     ylab = "Number needed to treat", ref = NA)
+    )
+    info <- map[[type]]
+    if (is.null(info$df)) stop("Requested contrast was not computed.")
+    df <- info$df
+    df$estimate <- df[[info$est]]
+
+    p <- ggplot(df, aes(x = time)) +
+        geom_line(aes(y = estimate, color = "Estimate"), na.rm = TRUE) +
+        geom_line(aes(y = ptwise.lower, color = "Pointwise CI"), linetype = "dashed", na.rm = TRUE) +
+        geom_line(aes(y = ptwise.upper, color = "Pointwise CI"), linetype = "dashed", na.rm = TRUE) +
+        geom_line(aes(y = unif.lower, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE) +
+        geom_line(aes(y = unif.upper, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE) +
+        scale_color_manual(values = c("Estimate" = "black",
+                                      "Pointwise CI" = "#0072B2",
+                                      "Uniform Band" = "#009E73")) +
+        xlab("Time") +
+        ylab(info$ylab) +
+        theme_bw() +
+        theme(legend.position = "bottom",
+              legend.title = element_blank(),
+              panel.grid.minor = element_blank())
+
+    if (is.finite(info$ref)) {
+        p <- p + geom_hline(yintercept = info$ref, color = "grey45", linetype = "dotted")
+    }
+    return(p)
+}
+
+.plot.np_bounds <- function(df) {
+    if ("ptwise.trans.lower" %in% names(df)) {
+        df$ptwise.lower <- df$ptwise.trans.lower
+        df$ptwise.upper <- df$ptwise.trans.upper
+        df$uniform.lower <- df$uniform.trans.lower
+        df$uniform.upper <- df$uniform.trans.upper
+    } else {
+        df$ptwise.lower <- df$ptwise.bounds.lower
+        df$ptwise.upper <- df$ptwise.bounds.upper
+        df$uniform.lower <- df$uniform.bounds.lower
+        df$uniform.upper <- df$uniform.bounds.upper
+    }
+
+    ggplot(df, aes(x = times)) +
+        geom_line(aes(y = theta.obs, color = "Observed Effect", linetype = "Observed Effect")) +
+        geom_line(aes(y = effect.lower, color = "Lower Effect Bound", linetype = "Lower Effect Bound")) +
+        geom_line(aes(y = effect.upper, color = "Upper Effect Bound", linetype = "Upper Effect Bound")) +
+        geom_line(aes(y = ptwise.lower, color = "Pointwise CI", linetype = "Pointwise CI")) +
+        geom_line(aes(y = ptwise.upper, color = "Pointwise CI", linetype = "Pointwise CI")) +
+        geom_line(aes(y = uniform.lower, color = "Uniform Band", linetype = "Uniform Band")) +
+        geom_line(aes(y = uniform.upper, color = "Uniform Band", linetype = "Uniform Band")) +
+        scale_color_manual(values = c(
+            "Observed Effect" = "black",
+            "Lower Effect Bound" = "#D55E00",
+            "Upper Effect Bound" = "#009E73",
+            "Pointwise CI" = "#0072B2",
+            "Uniform Band" = "#CC79A7"
+        )) +
+        scale_linetype_manual(values = c(
+            "Observed Effect" = "solid",
+            "Lower Effect Bound" = "dashed",
+            "Upper Effect Bound" = "dotdash",
+            "Pointwise CI" = "twodash",
+            "Uniform Band" = "longdash"
+        )) +
+        xlab("Time") +
+        ylab("Survival difference (treatment - control)") +
+        labs(color = "Type", linetype = "Type") +
+        theme_bw() +
+        theme(legend.position = "bottom",
+              legend.title = element_blank(),
+              panel.grid.minor = element_blank())
+}
+
 #' Estimate observed components
 #'
 #' @keywords internal
