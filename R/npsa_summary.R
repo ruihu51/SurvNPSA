@@ -396,6 +396,12 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
         upper <- "ptwise.upper"
     }
 
+    has.band <- !is.null(lower) && lower %in% names(df) && upper %in% names(df)
+    if (has.band) {
+        df$band.lower <- df[[lower]]
+        df$band.upper <- df[[upper]]
+    }
+
     p <- ggplot(df, aes(x = time, y = surv, color = as.factor(trt), group = trt)) +
         geom_step() +
         scale_color_manual(values = c("0" = "#0072B2", "1" = "#D55E00"),
@@ -409,9 +415,7 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
               legend.title = element_blank(),
               panel.grid.minor = element_blank())
 
-    if (!is.null(lower) && lower %in% names(df) && upper %in% names(df)) {
-        df$band.lower <- df[[lower]]
-        df$band.upper <- df[[upper]]
+    if (has.band) {
         p <- p +
             geom_step(aes(y = band.lower), linetype = "dashed", na.rm = TRUE) +
             geom_step(aes(y = band.upper), linetype = "dashed", na.rm = TRUE)
