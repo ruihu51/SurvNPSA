@@ -303,9 +303,15 @@
     surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = isotonize)
     surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = isotonize)
 
-    band.end.pts.0 <- .np_band_endpts(time[event == 1 & treat == 0], uniform.cutpoint, fit.times)
-    band.end.pts.1 <- .np_band_endpts(time[event == 1 & treat == 1], uniform.cutpoint, fit.times)
-    band.end.pts <- .np_band_endpts(time[event == 1], uniform.cutpoint, fit.times)
+    band.end.pts.0 <- .np_surv_band_endpts(time[event == 1 & treat == 0],
+                                           surv.0$surv.iso, fit.times,
+                                           uniform.cutpoint)
+    band.end.pts.1 <- .np_surv_band_endpts(time[event == 1 & treat == 1],
+                                           surv.1$surv.iso, fit.times,
+                                           uniform.cutpoint)
+    band.end.pts <- .np_contrast_band_endpts(time[event == 1],
+                                             surv.0$surv.iso, surv.1$surv.iso,
+                                             fit.times, uniform.cutpoint)
 
     surv.df.0 <- .np_surv_df_one(fit.times, surv.0, trt = 0, conf.band = conf.band,
                                  band.end.pts = band.end.pts.0,
@@ -319,8 +325,12 @@
     out <- list(surv.df = rbind(surv.df.0$surv.df, surv.df.1$surv.df),
                 surv.0.unif.ew.quant = surv.df.0$unif.ew.quant,
                 surv.0.unif.logit.quant = surv.df.0$unif.logit.quant,
+                surv.0.ew.sim.maxes = surv.df.0$ew.sim.maxes,
+                surv.0.logit.sim.maxes = surv.df.0$logit.sim.maxes,
                 surv.1.unif.ew.quant = surv.df.1$unif.ew.quant,
-                surv.1.unif.logit.quant = surv.df.1$unif.logit.quant)
+                surv.1.unif.logit.quant = surv.df.1$unif.logit.quant,
+                surv.1.ew.sim.maxes = surv.df.1$ew.sim.maxes,
+                surv.1.logit.sim.maxes = surv.df.1$logit.sim.maxes)
 
     if ("surv.diff" %in% contrasts) {
         out <- c(out, .np_surv.difference(fit.times = fit.times,
@@ -410,13 +420,49 @@
 
     return(list(surv.df = surv.df,
                 unif.ew.quant = c.int$unif.ew.quant,
-                unif.logit.quant = c.int$unif.logit.quant))
+                unif.logit.quant = c.int$unif.logit.quant,
+                ew.sim.maxes = c.int$ew.sim.maxes,
+                logit.sim.maxes = c.int$logit.sim.maxes))
 }
 
 .np_band_endpts <- function(event.times, uniform.cutpoint, fit.times) {
     event.times <- event.times[is.finite(event.times)]
     if (length(event.times) == 0) return(c(min(fit.times), max(fit.times)))
     out <- as.numeric(stats::quantile(event.times, uniform.cutpoint, na.rm = TRUE))
+    out[1] <- max(out[1], min(fit.times))
+    out[2] <- min(out[2], max(fit.times))
+    if (out[1] >= out[2]) out <- c(min(fit.times), max(fit.times))
+    return(out)
+}
+
+.np_surv_band_endpts <- function(event.times, surv.iso, fit.times, uniform.cutpoint) {
+    event.times <- event.times[is.finite(event.times)]
+    if (length(event.times) == 0) return(c(min(fit.times), max(fit.times)))
+
+    lower <- as.numeric(stats::quantile(event.times, uniform.cutpoint[1], na.rm = TRUE))
+    surv.cut <- 1 - uniform.cutpoint[2]
+    upper.idx <- !is.na(surv.iso) & surv.iso >= surv.cut
+    upper <- if (any(upper.idx)) max(fit.times[upper.idx]) else max(fit.times)
+
+    out <- c(lower, upper)
+    out[1] <- max(out[1], min(fit.times))
+    out[2] <- min(out[2], max(fit.times))
+    if (out[1] >= out[2]) out <- c(min(fit.times), max(fit.times))
+    return(out)
+}
+
+.np_contrast_band_endpts <- function(event.times, surv.0.iso, surv.1.iso,
+                                     fit.times, uniform.cutpoint) {
+    event.times <- event.times[is.finite(event.times)]
+    if (length(event.times) == 0) return(c(min(fit.times), max(fit.times)))
+
+    lower <- as.numeric(stats::quantile(event.times, uniform.cutpoint[1], na.rm = TRUE))
+    surv.cut <- 1 - uniform.cutpoint[2]
+    upper.idx <- (!is.na(surv.0.iso) & surv.0.iso >= surv.cut) |
+        (!is.na(surv.1.iso) & surv.1.iso >= surv.cut)
+    upper <- if (any(upper.idx)) max(fit.times[upper.idx]) else max(fit.times)
+
+    out <- c(lower, upper)
     out[1] <- max(out[1], min(fit.times))
     out[2] <- min(out[2], max(fit.times))
     if (out[1] >= out[2]) out <- c(min(fit.times), max(fit.times))

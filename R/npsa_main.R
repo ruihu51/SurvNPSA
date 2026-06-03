@@ -313,8 +313,10 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 #' @param conf.level Desired confidence level.
 #' @param contrasts Character vector of contrasts to report. Options are
 #'   \code{"surv.diff"}, \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.
-#' @param uniform.cutpoint Two probabilities used to choose the time window for
-#'   the no-confounding uniform test and CF-style uniform bands.
+#' @param uniform.cutpoint Two probabilities used for uniform procedures. For
+#'   CF-style uniform bands, the first gives the lower event-time quantile and
+#'   the second gives the upper survival threshold through \code{1 - p}. For the
+#'   no-confounding uniform test, both values are used as event-time quantiles.
 #' @param isotonize Logical; if TRUE, apply isotonization to treatment-specific
 #'   survival curves and survival bands.
 #' @param seed Optional integer seed for reproducible uniform bands and uniform

@@ -28,6 +28,12 @@ Vendored/adapted helper logic:
 - Treatment-specific survival reporting follows the CFsurvival structure:
   surv.df with trt, surv, se, pointwise CI columns, equal-width uniform bands,
   logit/equi-precision uniform bands, and isotonized survival curves.
+- CF-style uniform confidence-band windows are used for survival curves and
+  contrasts: the lower endpoint is the requested lower event-time quantile, and
+  the upper endpoint is the last fitted time where the relevant isotonized
+  survival curve remains above the survival threshold.
+- Treatment-specific survival uniform quantiles and simulation maxima are
+  returned with CFsurvival-style names where available.
 
 Intentional local modifications:
 - CFsurvival .surv.ratio() upstream has:
@@ -50,9 +56,10 @@ Intentional local modifications:
   fit.times even though the data frames include an added time-zero row. SurvNPSA
   masks using the data-frame time column so the logical index length matches the
   output rows.
-- SurvNPSA uses np_surv.options()$uniform.cutpoint to choose the uniform-band
-  and no-effect-test time window. This keeps the default close to CFsurvival's
-  0.01 lower-window behavior while exposing the window to users.
+- SurvNPSA uses np_surv.options()$uniform.cutpoint for the CF-style uniform-band
+  window, with c(0.01, 0.99) corresponding to CFsurvival's lower 0.01 event-time
+  quantile and upper survival threshold 1 - 0.99 = 0.01. The SurvNPSA-specific
+  no-effect uniform test keeps its own event-time quantile window.
 - SurvNPSA creates stable uniform-band columns filled with NA when
   conf.band = FALSE, so user-facing output has the same column names whether or
   not bands are requested.
@@ -62,4 +69,3 @@ Not modified:
 - Rui's observed-component formulas in .get.obs.comps() are not changed.
 - SurvNPSA's existing no-confounding uniform test statistic is preserved for
   np_surv()$uniform.test.
-

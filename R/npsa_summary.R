@@ -365,7 +365,10 @@ summary.npSurv <- function(object, digits = 3, ...) {
 #' @param x An object returned by \code{\link{np_surv}()}.
 #' @param type Plot type. Options are \code{"surv"}, \code{"surv.diff"},
 #'   \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.
-#' @param band Band type for treatment-specific survival curves.
+#' @param uniform Logical; whether to add uniform confidence bands.
+#' @param transform Logical; for treatment-specific survival curves, whether to
+#'   use logit-scale pointwise confidence intervals and logit/equi-precision
+#'   uniform bands. Contrast plots use their CFsurvival-style inference scale.
 #' @param ... Additional arguments.
 #'
 #' @return A \code{ggplot} object.
@@ -373,37 +376,46 @@ summary.npSurv <- function(object, digits = 3, ...) {
 #' @export
 #' @method plot npSurv
 plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.ratio", "nnt"),
-                        band = c("logit", "equal-width", "pointwise", "none"), ...) {
+                        uniform = TRUE, transform = TRUE, ...) {
     type <- match.arg(type)
-    band <- match.arg(band)
 
     if (type == "surv") {
-        return(.plot.np_surv_curves(x$surv.df, band = band))
+        return(.plot.np_surv_curves(x$surv.df, uniform = uniform, transform = transform))
     }
-    return(.plot.np_contrast(x, type = type))
+    return(.plot.np_contrast(x, type = type, uniform = uniform))
 }
 
-.plot.np_surv_curves <- function(df, band = "logit") {
-    lower <- upper <- NULL
-    if (band == "logit") {
-        lower <- "unif.logit.lower"
-        upper <- "unif.logit.upper"
-    } else if (band == "equal-width") {
-        lower <- "unif.ew.lower"
-        upper <- "unif.ew.upper"
-    } else if (band == "pointwise") {
-        lower <- "ptwise.lower"
-        upper <- "ptwise.upper"
+.plot.np_surv_curves <- function(df, uniform = TRUE, transform = TRUE) {
+    if (transform) {
+        ptwise.lower <- "ptwise.logit.lower"
+        ptwise.upper <- "ptwise.logit.upper"
+        unif.lower <- "unif.logit.lower"
+        unif.upper <- "unif.logit.upper"
+    } else {
+        ptwise.lower <- "ptwise.lower"
+        ptwise.upper <- "ptwise.upper"
+        unif.lower <- "unif.ew.lower"
+        unif.upper <- "unif.ew.upper"
     }
 
-    has.band <- !is.null(lower) && lower %in% names(df) && upper %in% names(df)
-    if (has.band) {
-        df$band.lower <- df[[lower]]
-        df$band.upper <- df[[upper]]
+    needed <- c(ptwise.lower, ptwise.upper)
+    if (!all(needed %in% names(df))) {
+        stop("Requested pointwise confidence interval columns were not found.")
+    }
+
+    df$ptwise.plot.lower <- df[[ptwise.lower]]
+    df$ptwise.plot.upper <- df[[ptwise.upper]]
+
+    has.uniform <- isTRUE(uniform) && all(c(unif.lower, unif.upper) %in% names(df))
+    if (has.uniform) {
+        df$uniform.plot.lower <- df[[unif.lower]]
+        df$uniform.plot.upper <- df[[unif.upper]]
     }
 
     p <- ggplot(df, aes(x = time, y = surv, color = as.factor(trt), group = trt)) +
         geom_step() +
+        geom_step(aes(y = ptwise.plot.lower), linetype = "dashed", na.rm = TRUE) +
+        geom_step(aes(y = ptwise.plot.upper), linetype = "dashed", na.rm = TRUE) +
         scale_color_manual(values = c("0" = "#0072B2", "1" = "#D55E00"),
                            labels = c("0" = "Control", "1" = "Treatment")) +
         labs(color = "Treatment") +
@@ -415,15 +427,15 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
               legend.title = element_blank(),
               panel.grid.minor = element_blank())
 
-    if (has.band) {
+    if (has.uniform) {
         p <- p +
-            geom_step(aes(y = band.lower), linetype = "dashed", na.rm = TRUE) +
-            geom_step(aes(y = band.upper), linetype = "dashed", na.rm = TRUE)
+            geom_step(aes(y = uniform.plot.lower), linetype = "longdash", na.rm = TRUE) +
+            geom_step(aes(y = uniform.plot.upper), linetype = "longdash", na.rm = TRUE)
     }
     return(p)
 }
 
-.plot.np_contrast <- function(x, type) {
+.plot.np_contrast <- function(x, type, uniform = TRUE) {
     map <- list(
         "surv.diff" = list(df = x$surv.diff.df, est = "surv.diff",
                            ylab = "Survival difference (treatment - control)", ref = 0),
@@ -443,8 +455,6 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
         geom_line(aes(y = estimate, color = "Estimate"), na.rm = TRUE) +
         geom_line(aes(y = ptwise.lower, color = "Pointwise CI"), linetype = "dashed", na.rm = TRUE) +
         geom_line(aes(y = ptwise.upper, color = "Pointwise CI"), linetype = "dashed", na.rm = TRUE) +
-        geom_line(aes(y = unif.lower, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE) +
-        geom_line(aes(y = unif.upper, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE) +
         scale_color_manual(values = c("Estimate" = "black",
                                       "Pointwise CI" = "#0072B2",
                                       "Uniform Band" = "#009E73")) +
@@ -454,6 +464,12 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
         theme(legend.position = "bottom",
               legend.title = element_blank(),
               panel.grid.minor = element_blank())
+
+    if (isTRUE(uniform)) {
+        p <- p +
+            geom_line(aes(y = unif.lower, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE) +
+            geom_line(aes(y = unif.upper, color = "Uniform Band"), linetype = "longdash", na.rm = TRUE)
+    }
 
     if (is.finite(info$ref)) {
         p <- p + geom_hline(yintercept = info$ref, color = "grey45", linetype = "dotted")

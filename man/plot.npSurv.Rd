@@ -7,7 +7,8 @@
 \method{plot}{npSurv}(
   x,
   type = c("surv", "surv.diff", "surv.ratio", "risk.ratio", "nnt"),
-  band = c("logit", "equal-width", "pointwise", "none"),
+  uniform = TRUE,
+  transform = TRUE,
   ...
 )
 }
@@ -17,7 +18,11 @@
 \item{type}{Plot type. Options are \code{"surv"}, \code{"surv.diff"},
 \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.}
 
-\item{band}{Band type for treatment-specific survival curves.}
+\item{uniform}{Logical; whether to add uniform confidence bands.}
+
+\item{transform}{Logical; for treatment-specific survival curves, whether to
+use logit-scale pointwise confidence intervals and logit/equi-precision
+uniform bands. Contrast plots use their CFsurvival-style inference scale.}
 
 \item{...}{Additional arguments.}
 }
