@@ -216,10 +216,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 #' @param confounders Matrix or data frame of observed confounders.
 #' @param fit.times Numeric vector of times for survival estimation.
 #' @param nuisance.options List of options for nuisance estimation.
-#' @param target.options List of options for target parameter estimation.
 #' @param np.options List of options from \code{\link{np_surv.options}()}.
-#' @param rmst Logical; if TRUE, estimate RMST using the existing SurvNPSA RMST pipeline.
-#' @param rmst.options List of options for RMST estimation.
 #' @param result Optional precomputed result object containing nuisances or observed components.
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print progress messages.
@@ -230,22 +227,17 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 #' @export
 np_surv <- function(time, event, treat, confounders, fit.times,
                     nuisance.options = list(),
-                    target.options = list(),
                     np.options = list(),
-                    rmst = FALSE,
-                    rmst.options = list(),
                     result = NULL,
                     var_names = NULL,
                     verbose = FALSE,
                     save = FALSE) {
 
     # Update control parameters
-    target.options <- do.call(npsa_target.options, target.options)
     np.options <- do.call(np_surv.options, np.options)
-    rmst.options <- do.call(npsa_rmst.options, rmst.options)
 
     # Extract options
-    psi.type <- target.options$psi.type
+    psi.type <- "hybrid"
     plot.times <- np.options$plot.times
     conf.band <- np.options$conf.band
     conf.level <- np.options$conf.level
@@ -253,12 +245,6 @@ np_surv <- function(time, event, treat, confounders, fit.times,
     uniform.cutpoint <- np.options$uniform.cutpoint
     isotonize <- np.options$isotonize
     seed <- np.options$seed
-    fit.times.rmst <- rmst.options$fit.times.rmst
-    gamma.type <- rmst.options$gamma.type
-    max_gap <- rmst.options$max_gap
-    tol <- rmst.options$tol
-    tol1 <- rmst.options$tol1
-    tol2 <- rmst.options$tol2
 
     n_var <- ncol(confounders)
     if (is.null(var_names)) {
@@ -268,18 +254,9 @@ np_surv <- function(time, event, treat, confounders, fit.times,
     if (length(var_names) != n_var) {
         stop("`var_names` must have one name for each confounder.")
     }
-    if (!is.null(seed)) {
-        has.seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-        if (has.seed) old.seed <- get(".Random.seed", envir = .GlobalEnv)
-        on.exit({
-            if (has.seed) {
-                assign(".Random.seed", old.seed, envir = .GlobalEnv)
-            } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-                rm(".Random.seed", envir = .GlobalEnv)
-            }
-        }, add = TRUE)
-        set.seed(seed)
-    }
+    if (is.null(seed)) seed <- sample(1:1e8, 1)
+    set.seed(seed)
+    np.options$seed <- seed
 
     # Nuisance Estimation
     if (verbose) cat("Start estimating nuisances:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -296,19 +273,6 @@ np_surv <- function(time, event, treat, confounders, fit.times,
         if (save) save(result, file = "dev/result.RData")
     }
 
-    # RMST Estimation if requested
-    if (rmst) {
-        if (is.null(fit.times.rmst)) stop("Must specify 'fit.times.rmst' when rmst = TRUE.")
-        if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        if (is.null(result$rmst.obs)) {
-            eval.times.rmst <- result$fit.times
-            result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
-                                          max_gap, tol, tol1, tol2,
-                                          gamma.type, verbose = verbose)
-            if (save) save(result, file = "dev/result.RData")
-        }
-    }
-
     if (is.null(plot.times)) plot.times <- result$fit.times
     plot.times <- plot.times[plot.times >= min(result$fit.times) &
                                  plot.times <= max(result$fit.times)]
@@ -322,10 +286,6 @@ np_surv <- function(time, event, treat, confounders, fit.times,
                                  uniform.cutpoint = uniform.cutpoint,
                                  isotonize = isotonize)
 
-    # Observed bounds when d = 0
-    bounds.df <- .report.bounds(plot.times, result, rmst = rmst,
-                                transform = TRUE, scale = TRUE)
-
     # Uniform test for no observed survival difference
     uniform.test <- .np_uniform_test(result, time, event,
                                     uniform.cutpoint = uniform.cutpoint,
@@ -334,15 +294,11 @@ np_surv <- function(time, event, treat, confounders, fit.times,
     ci.summary <- .np_ci_summary(cf.out$surv.diff.df, plot.times)
 
     out <- c(list(result = result,
-                  bounds.df = bounds.df,
                   uniform.test = uniform.test,
                   ci.summary = ci.summary,
                   plot.times = plot.times,
                   var_names = var_names,
-                  options = list(target.options = target.options,
-                                 np.options = np.options,
-                                 rmst = rmst,
-                                 rmst.options = rmst.options)),
+                  options = list(np.options = np.options)),
              cf.out)
 
     class(out) <- "npSurv"
@@ -362,7 +318,7 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 #' @param isotonize Logical; if TRUE, apply isotonization to treatment-specific
 #'   survival curves and survival bands.
 #' @param seed Optional integer seed for reproducible uniform bands and uniform
-#'   test p-values. Use \code{NULL} to leave the random seed unchanged.
+#'   test p-values. Use \code{NULL} to randomly choose and store a seed.
 #'
 #' @return A named list of options.
 #'

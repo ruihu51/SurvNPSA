@@ -31,7 +31,7 @@ the no-confounding uniform test and CF-style uniform bands.}
 survival curves and survival bands.}
 
 \item{seed}{Optional integer seed for reproducible uniform bands and uniform
-test p-values. Use \code{NULL} to leave the random seed unchanged.}
+test p-values. Use \code{NULL} to randomly choose and store a seed.}
 }
 \value{
 A named list of options.

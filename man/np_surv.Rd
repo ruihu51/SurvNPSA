@@ -11,10 +11,7 @@ np_surv(
   confounders,
   fit.times,
   nuisance.options = list(),
-  target.options = list(),
   np.options = list(),
-  rmst = FALSE,
-  rmst.options = list(),
   result = NULL,
   var_names = NULL,
   verbose = FALSE,
@@ -34,13 +31,7 @@ np_surv(
 
 \item{nuisance.options}{List of options for nuisance estimation.}
 
-\item{target.options}{List of options for target parameter estimation.}
-
 \item{np.options}{List of options from \code{\link{np_surv.options}()}.}
-
-\item{rmst}{Logical; if TRUE, estimate RMST using the existing SurvNPSA RMST pipeline.}
-
-\item{rmst.options}{List of options for RMST estimation.}
 
 \item{result}{Optional precomputed result object containing nuisances or observed components.}
 

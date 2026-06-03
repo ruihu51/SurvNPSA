@@ -6,7 +6,7 @@
 \usage{
 \method{plot}{npSurv}(
   x,
-  type = c("surv", "surv.diff", "surv.ratio", "risk.ratio", "nnt", "bounds"),
+  type = c("surv", "surv.diff", "surv.ratio", "risk.ratio", "nnt"),
   band = c("logit", "equal-width", "pointwise", "none"),
   ...
 )
@@ -15,7 +15,7 @@
 \item{x}{An object returned by \code{\link{np_surv}()}.}
 
 \item{type}{Plot type. Options are \code{"surv"}, \code{"surv.diff"},
-\code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"}, and \code{"bounds"}.}
+\code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.}
 
 \item{band}{Band type for treatment-specific survival curves.}
 
