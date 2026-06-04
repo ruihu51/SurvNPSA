@@ -11,6 +11,7 @@
 #' @param fit.times Numeric vector of times at which nuisance estimators are fit.
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param target.options List of options for target parameter estimation.
+#'   May include \code{psi.type} and \code{tau.type}.
 #' @param bound.options List of options for reporting pointwise and uniform bounds.
 #'   The \code{transform} option is also used for pointwise MIRV calculation.
 #' @param rv.options List of options for robustness value computation. May include
@@ -70,6 +71,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
     # Extract options
     psi.type <- target.options$psi.type
+    tau.type <- target.options$tau.type
     plot.times <- bound.options$plot.times
     transform <- bound.options$transform
     scale <- bound.options$scale
@@ -110,9 +112,12 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     # Observed Components Estimation
     if (verbose) cat("Start estimating target:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     if (is.null(result$obs.comps.df)) {
-        result <- .get.obs.comps(time, event, treat, result, psi.type = psi.type, verbose = verbose)
+        result <- .get.obs.comps(time, event, treat, result,
+                                 psi.type = psi.type, tau.type = tau.type,
+                                 verbose = verbose)
         if (save) save(result, file = "dev/result.RData")
     }
+    if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
 
     # RMST Estimation if requested
     if (rmst) {
@@ -238,6 +243,7 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 
     # Extract options
     psi.type <- "hybrid"
+    tau.type <- "hybrid"
     plot.times <- np.options$plot.times
     conf.band <- np.options$conf.band
     conf.level <- np.options$conf.level
@@ -269,9 +275,12 @@ np_surv <- function(time, event, treat, confounders, fit.times,
     # Observed Components Estimation
     if (verbose) cat("Start estimating no-unobserved-confounding survival:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     if (is.null(result$obs.comps.df)) {
-        result <- .get.obs.comps(time, event, treat, result, psi.type = psi.type, verbose = verbose)
+        result <- .get.obs.comps(time, event, treat, result,
+                                 psi.type = psi.type, tau.type = tau.type,
+                                 verbose = verbose)
         if (save) save(result, file = "dev/result.RData")
     }
+    if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
 
     if (is.null(plot.times)) plot.times <- result$fit.times
     plot.times <- plot.times[plot.times >= min(result$fit.times) &
@@ -378,8 +387,8 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
          seed = seed)
 }
 
-npsa_target.options <- function(psi.type = "hybrid") {
-    list(psi.type = psi.type)
+npsa_target.options <- function(psi.type = "hybrid", tau.type = "hybrid") {
+    list(psi.type = psi.type, tau.type = tau.type)
 }
 
 npsa_bound.options <- function(plot.times = c(0.5, 0.8, 1.2), transform = TRUE, scale = TRUE) {

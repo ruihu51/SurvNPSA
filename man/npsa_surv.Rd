@@ -36,7 +36,8 @@ npsa_surv(
 
 \item{nuisance.options}{List of options for nuisance estimation.}
 
-\item{target.options}{List of options for target parameter estimation.}
+\item{target.options}{List of options for target parameter estimation.
+May include \code{psi.type} and \code{tau.type}.}
 
 \item{bound.options}{List of options for reporting pointwise and uniform bounds.
 The \code{transform} option is also used for pointwise MIRV calculation.}

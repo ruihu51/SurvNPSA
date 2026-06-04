@@ -4,7 +4,15 @@
 \alias{.get.obs.comps}
 \title{Estimate Observed Components (Internal)}
 \usage{
-.get.obs.comps(time, event, treat, result, psi.type, verbose = TRUE)
+.get.obs.comps(
+  time,
+  event,
+  treat,
+  result,
+  psi.type,
+  tau.type = "hybrid",
+  verbose = TRUE
+)
 }
 \arguments{
 \item{time}{Numeric vector of survival times.}
@@ -15,7 +23,9 @@
 
 \item{result}{List containing nuisance function results.}
 
-\item{psi.type}{Character; type of psi estimation ("hybrid", "simple", etc.).}
+\item{psi.type}{Character; type of psi estimation ("hybrid", "plug.in", etc.).}
+
+\item{tau.type}{Character; type of tau estimation ("hybrid", "plug.in", etc.).}
 
 \item{verbose}{Logical; print messages if TRUE.}
 }

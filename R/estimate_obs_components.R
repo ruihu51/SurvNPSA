@@ -6,13 +6,14 @@
 #' @param event Numeric vector of event indicators (1 = event, 0 = censored).
 #' @param treat Numeric vector of treatment assignments.
 #' @param result List containing nuisance function results.
-#' @param psi.type Character; type of psi estimation ("hybrid", "simple", etc.).
+#' @param psi.type Character; type of psi estimation ("hybrid", "plug.in", etc.).
+#' @param tau.type Character; type of tau estimation ("hybrid", "plug.in", etc.).
 #' @param verbose Logical; print messages if TRUE.
 #'
 #' @return Updated result list with observed treatment effects.
 #'
 #' @keywords internal
-.get.obs.comps <- function(time, event, treat, result, psi.type, verbose=TRUE){
+.get.obs.comps <- function(time, event, treat, result, psi.type, tau.type="hybrid", verbose=TRUE){
 
     fit.times <- result$fit.times
 
@@ -49,12 +50,11 @@
                              G.hats=result$nuisance$cens.pred,
                              psi.type)
     result$obs.comps.df$psi <- psi.rst$psi.est
-    result$obs.comps.df$gamma <- psi.rst$gamma.est
     result$IF.vals.psi <- psi.rst$IF.vals.psi
 
     # estimate tau_n = E(alpha_s(A,W)^2)
     if(verbose) message("Estimating tau...")
-    tau.rst <- .estimate.tau(A=treat, g.hats=result$nuisance$prop.pred)
+    tau.rst <- .estimate.tau(A=treat, g.hats=result$nuisance$prop.pred, tau.type=tau.type)
     result$tau <- tau.rst$est
     result$IF.vals.tau <- tau.rst$IF.vals.tau
 
@@ -146,9 +146,7 @@
     G.hats.Y <- sapply(1:n, function(i) stepfun(eval.times, c(1,G.hats[i,]), right = TRUE)(Y[i]))
 
     IF.vals.psi <- matrix(NA, nrow=n, ncol=length(fit.times))
-    IF.vals.gamma <- matrix(NA, nrow=n, ncol=length(fit.times))
     psi.est <- rep(NA, length(fit.times))
-    gamma.est <- rep(NA, length(fit.times))
 
     for(t0 in fit.times) {
         k <- min(which(eval.times >= t0))
@@ -171,27 +169,43 @@
         } else {
             psi.est[k1] <- mean(if.func.psi)
         }
-
-        if.func.gamma <- S.hats.t0^2 * 2 * ( -inner.func.1 + inner.func.2) + S.hats.t0^2
-        gamma.est[k1] <- mean(if.func.gamma)
-        IF.vals.gamma[,k1] <- if.func.gamma - gamma.est[k1]
     }
-    res <- list(times=fit.times, psi.est=psi.est, IF.vals.psi=IF.vals.psi,
-                gamma.est=gamma.est, IF.vals.gamma=IF.vals.gamma)
+    res <- list(times=fit.times, psi.est=psi.est, IF.vals.psi=IF.vals.psi)
 
     return(res)
 }
 
 
-.estimate.tau <- function(A, g.hats){
+.estimate.tau <- function(A, g.hats, tau.type="hybrid"){
     # estimate tau=E[\alpha_s^2]
+    if (any(!is.finite(g.hats))) {
+        stop("`g.hats` must contain finite values for tau estimation.")
+    }
+
+    g.trunc <- 1e-3
+    if (any(g.hats <= g.trunc | g.hats >= 1 - g.trunc)) {
+        message("Some propensity scores were too close to 0 or 1 and were truncated for tau estimation.")
+        g.hats <- pmin(pmax(g.hats, g.trunc), 1 - g.trunc)
+    }
+
     if.func.tau <- 2/(g.hats*(1-g.hats)) - ((A-g.hats)/(g.hats*(1-g.hats)))^2
     tau.est <- mean(if.func.tau)
     IF.vals.tau <- if.func.tau - tau.est
+
+    # plug-in estimator
+    tau.est.plug.in <- mean(1/(g.hats*(1-g.hats)))
+    if (tau.type=="plug.in") {
+        tau.est <- tau.est.plug.in
+    } else if (tau.type=="hybrid") {
+        tau.est <- ifelse(tau.est>0, tau.est,
+                          tau.est.plug.in)
+    } else {
+        tau.est <- mean(if.func.tau)
+    }
+
     res <- list(est=tau.est, IF.vals.tau=IF.vals.tau)
 
     return(res)
 
 }
-
 
