@@ -326,8 +326,10 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 #'   CF-style uniform bands, the first gives the lower event-time quantile and
 #'   the second gives the upper survival threshold through \code{1 - p}. For the
 #'   no-confounding uniform test, both values are used as event-time quantiles.
-#' @param isotonize Logical; if TRUE, apply isotonization to treatment-specific
-#'   survival curves and survival bands.
+#' @param isotonize Logical; if TRUE, apply CFsurvival-style isotonization to
+#'   treatment-specific survival curve display and treatment-specific survival
+#'   uniform bands. Pointwise confidence intervals and survival contrasts remain
+#'   based on the raw one-step survival estimates and influence functions.
 #' @param seed Optional integer seed for reproducible uniform bands and uniform
 #'   test p-values. Use \code{NULL} to randomly choose and store a seed.
 #'

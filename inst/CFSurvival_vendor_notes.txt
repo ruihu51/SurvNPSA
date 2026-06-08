@@ -28,6 +28,10 @@ Vendored/adapted helper logic:
 - Treatment-specific survival reporting follows the CFsurvival structure:
   surv.df with trt, surv, se, pointwise CI columns, equal-width uniform bands,
   logit/equi-precision uniform bands, and isotonized survival curves.
+- Isotonization follows CFsurvival's scope: it is used for treatment-specific
+  survival curve display and treatment-specific survival uniform bands. It is
+  not used to create a new influence function, to change pointwise confidence
+  intervals, or to change survival contrast estimates/inference.
 - CF-style uniform confidence-band windows are used for survival curves and
   contrasts: the lower endpoint is the requested lower event-time quantile, and
   the upper endpoint is the last fitted time where the relevant isotonized
