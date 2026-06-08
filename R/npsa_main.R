@@ -16,6 +16,8 @@
 #'   The \code{transform} option is also used for pointwise MIRV calculation.
 #' @param rv.options List of options for robustness value computation. May include
 #'   \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
+#'   The \code{uniform.cutpoint} option follows the CFsurvival-style window:
+#'   lower event-time quantile and upper survival cutoff.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
@@ -190,9 +192,13 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     # Robustness Values computations
     if (!is.null(rv.times)) {
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        t.lower <- quantile(time[event == 1], uniform.cutpoint[1])
-        t.upper <- quantile(time[event == 1], uniform.cutpoint[2])
-        cat(t.lower, t.upper, "\n")
+        surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
+        surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
+        band.end.pts <- .np_contrast_band_endpts(time[event == 1],
+                                                 surv.0$surv.iso, surv.1$surv.iso,
+                                                 result$fit.times, uniform.cutpoint)
+        t.lower <- band.end.pts[1]
+        t.upper <- band.end.pts[2]
 
         out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
                                  transform = transform,
@@ -322,10 +328,10 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 #' @param conf.level Desired confidence level.
 #' @param contrasts Character vector of contrasts to report. Options are
 #'   \code{"surv.diff"}, \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.
-#' @param uniform.cutpoint Two probabilities used for uniform procedures. For
-#'   CF-style uniform bands, the first gives the lower event-time quantile and
-#'   the second gives the upper survival threshold through \code{1 - p}. For the
-#'   no-confounding uniform test, both values are used as event-time quantiles.
+#' @param uniform.cutpoint Two probabilities used for uniform procedures. The
+#'   first gives the lower event-time quantile and the second gives the upper
+#'   survival threshold through \code{1 - p}, following the CFsurvival uniform
+#'   band window.
 #' @param isotonize Logical; if TRUE, apply CFsurvival-style isotonization to
 #'   treatment-specific survival curve display and treatment-specific survival
 #'   uniform bands. Pointwise confidence intervals and survival contrasts remain

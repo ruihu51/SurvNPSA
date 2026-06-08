@@ -36,6 +36,10 @@ Vendored/adapted helper logic:
   contrasts: the lower endpoint is the requested lower event-time quantile, and
   the upper endpoint is the last fitted time where the relevant isotonized
   survival curve remains above the survival threshold.
+- SurvNPSA also uses this CFsurvival-style contrast window for the
+  no-confounding uniform test and the RV uniform window, so
+  uniform.cutpoint = c(0.01, 0.99) consistently means a 1% lower event-time
+  quantile and a 0.01 upper survival cutoff.
 - Treatment-specific survival uniform quantiles and simulation maxima are
   returned with CFsurvival-style names where available.
 

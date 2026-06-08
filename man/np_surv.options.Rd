@@ -24,10 +24,10 @@ np_surv.options(
 \item{contrasts}{Character vector of contrasts to report. Options are
 \code{"surv.diff"}, \code{"surv.ratio"}, \code{"risk.ratio"}, and \code{"nnt"}.}
 
-\item{uniform.cutpoint}{Two probabilities used for uniform procedures. For
-CF-style uniform bands, the first gives the lower event-time quantile and
-the second gives the upper survival threshold through \code{1 - p}. For the
-no-confounding uniform test, both values are used as event-time quantiles.}
+\item{uniform.cutpoint}{Two probabilities used for uniform procedures. The
+first gives the lower event-time quantile and the second gives the upper
+survival threshold through \code{1 - p}, following the CFsurvival uniform
+band window.}
 
 \item{isotonize}{Logical; if TRUE, apply CFsurvival-style isotonization to
 treatment-specific survival curve display and treatment-specific survival

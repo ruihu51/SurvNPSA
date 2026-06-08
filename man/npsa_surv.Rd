@@ -43,7 +43,9 @@ May include \code{psi.type} and \code{tau.type}.}
 The \code{transform} option is also used for pointwise MIRV calculation.}
 
 \item{rv.options}{List of options for robustness value computation. May include
-\code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.}
+\code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
+The \code{uniform.cutpoint} option follows the CFsurvival-style window:
+lower event-time quantile and upper survival cutoff.}
 
 \item{rmst}{Logical; if TRUE, estimate RMST and its bounds inference as well.}
 
