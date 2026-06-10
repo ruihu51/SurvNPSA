@@ -92,7 +92,6 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     transform <- bound.options$transform
     scale <- bound.options$scale
     rv.times <- rv.options$rv.times
-    plot.times.user <- !is.null(plot.times)
     uniform.cutpoint <- rv.options$uniform.cutpoint
     rho <- rv.options$rho
     theta <- rv.options$theta
@@ -167,15 +166,24 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
-                                    label = "plot.times")
-    if (is.null(rv.times)) {
-        rv.times <- plot.times
-        if (!plot.times.user && length(rv.times) > 5) {
-            idx <- unique(round(seq(1, length(rv.times), length.out = 5)))
-            rv.times <- rv.times[idx]
+    if (is.null(plot.times)) {
+        plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
+                                        label = "plot.times")
+        if (is.null(rv.times)) {
+            rv.times <- result$fit.times
+            if (length(rv.times) > 5) {
+                idx <- unique(round(seq(1, length(rv.times), length.out = 5)))
+                rv.times <- rv.times[idx]
+            }
         }
     } else {
+        plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
+                                        label = "plot.times")
+        if (is.null(rv.times)) {
+            rv.times <- plot.times
+        }
+    }
+    if (!is.null(rv.times)) {
         rv.times <- .get.report.times(rv.times, result$fit.times, default.all = FALSE,
                                       label = "rv.times")
     }
@@ -463,176 +471,6 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
          uniform.cutpoint = uniform.cutpoint,
          isotonize = isotonize,
          seed = seed)
-}
-
-.get.time.info <- function(time, event, fit.times, nuisance.options,
-                           max.fit.times = 50, max.eval.times = 200,
-                           G.cutoff = 0.05, verbose = FALSE) {
-    if (is.null(nuisance.options)) nuisance.options <- list()
-    time.info <- list()
-    censor.df <- NULL
-
-    if (is.null(fit.times)) {
-        if (sum(event == 1) == 0) {
-            stop("No uncensored events; cannot choose default fit.times.")
-        }
-
-        max.event <- max(time[event == 1])
-        all.times <- sort(unique(time[time > 0 & time < max.event]))
-        if (length(all.times) == 0) {
-            all.times <- sort(unique(time[time > 0 & time <= max.event]))
-        }
-        if (length(all.times) == 0) {
-            stop("No positive follow-up times available for default fit.times.")
-        }
-        all.times.full <- all.times
-
-        if (sum(event == 0) == 0) {
-            G.hat <- rep(1, length(all.times))
-        } else {
-            G.fit <- tryCatch({
-                survival::survfit(survival::Surv(time, 1 - event) ~ 1)
-            }, error = function(e) {
-                NULL
-            })
-            G.hat <- tryCatch({
-                summary(G.fit, times = all.times, extend = TRUE)$surv
-            }, error = function(e) {
-                rep(NA_real_, length(all.times))
-            })
-        }
-
-        keep.idx <- which(is.finite(G.hat) & G.hat >= G.cutoff)
-        upper.type <- "G.cutoff"
-        if (length(keep.idx) == 0) {
-            event.times <- sort(unique(time[event == 1 & time > 0]))
-            upper.time <- as.numeric(stats::quantile(event.times, probs = 0.95,
-                                                     type = 1, na.rm = TRUE))
-            upper.type <- "event.quantile"
-        } else {
-            upper.time <- max(all.times[keep.idx])
-        }
-        if (!is.finite(upper.time)) upper.time <- max(all.times)
-
-        censor.df <- data.frame(time = all.times.full,
-                                G.hat = as.numeric(G.hat),
-                                keep = all.times.full <= upper.time)
-        all.times <- all.times[all.times <= upper.time]
-        if (length(all.times) == 0) {
-            all.times <- min(sort(unique(time[time > 0])))
-        }
-        fit.times <- all.times
-        if (length(fit.times) > max.fit.times) {
-            idx <- unique(round(seq(1, length(fit.times), length.out = max.fit.times)))
-            fit.times <- fit.times[idx]
-        }
-
-        time.info$fit.times.source <- "automatic"
-        time.info$upper.time.source <- upper.type
-        time.info$upper.time <- max(fit.times)
-        time.info$G.cutoff <- G.cutoff
-        time.info$n.all.times <- length(all.times)
-        if (verbose) {
-            message("Using automatic fit.times with ", length(fit.times),
-                    " time points up to ", signif(max(fit.times), 4), ".")
-        }
-    } else {
-        if (!is.numeric(fit.times) || any(!is.finite(fit.times))) {
-            stop("`fit.times` must be NULL or a finite numeric vector.")
-        }
-        fit.times <- sort(unique(fit.times))
-        if (any(fit.times <= 0)) {
-            fit.times <- fit.times[fit.times > 0]
-            message("fit.times <= 0 removed.")
-        }
-        if (sum(event == 1) == 0) stop("No uncensored events; cannot perform estimation.")
-        if (any(fit.times > max(time[event == 1]))) {
-            fit.times <- fit.times[fit.times <= max(time[event == 1])]
-            message("fit.times > max(time[event == 1]) removed.")
-        }
-        if (length(fit.times) == 0) {
-            stop("No `fit.times` remain within the observed event-time range.")
-        }
-        time.info$fit.times.source <- "user"
-        time.info$upper.time.source <- "user"
-        time.info$upper.time <- max(fit.times)
-        time.info$G.cutoff <- G.cutoff
-        time.info$n.all.times <- length(fit.times)
-    }
-
-    if (is.null(censor.df) && sum(event == 1) > 0) {
-        max.event <- max(time[event == 1])
-        all.times <- sort(unique(time[time > 0 & time < max.event]))
-        if (length(all.times) == 0) {
-            all.times <- sort(unique(time[time > 0 & time <= max.event]))
-        }
-        if (length(all.times) > 0) {
-            if (sum(event == 0) == 0) {
-                G.hat <- rep(1, length(all.times))
-            } else {
-                G.fit <- tryCatch({
-                    survival::survfit(survival::Surv(time, 1 - event) ~ 1)
-                }, error = function(e) {
-                    NULL
-                })
-                G.hat <- tryCatch({
-                    summary(G.fit, times = all.times, extend = TRUE)$surv
-                }, error = function(e) {
-                    rep(NA_real_, length(all.times))
-                })
-            }
-            censor.df <- data.frame(time = all.times,
-                                    G.hat = as.numeric(G.hat),
-                                    keep = all.times <= max(fit.times))
-        }
-    }
-
-    if (is.null(nuisance.options$eval.times)) {
-        eval.times <- sort(unique(time[time > 0 & time <= max(fit.times)]))
-        if (length(eval.times) > max.eval.times) {
-            idx <- unique(round(seq(1, length(eval.times), length.out = max.eval.times)))
-            eval.times <- eval.times[idx]
-        }
-        nuisance.options$eval.times <- sort(unique(c(0, eval.times, max(fit.times))))
-        time.info$eval.times.source <- "automatic"
-    } else {
-        time.info$eval.times.source <- "user"
-    }
-
-    time.info$fit.times <- fit.times
-    time.info$eval.times <- nuisance.options$eval.times
-    time.info$n.fit.times <- length(fit.times)
-    time.info$n.eval.times <- length(nuisance.options$eval.times)
-    time.info$max.fit.times <- max.fit.times
-    time.info$max.eval.times <- max.eval.times
-
-    list(fit.times = fit.times,
-         nuisance.options = nuisance.options,
-         time.info = time.info,
-         censor.df = censor.df)
-}
-
-.get.report.times <- function(times, fit.times, default.all = TRUE,
-                              label = "plot.times") {
-    if (is.null(times)) {
-        if (default.all) return(fit.times)
-        return(numeric(0))
-    }
-    if (!is.numeric(times) || any(!is.finite(times))) {
-        stop("`", label, "` must be NULL or a finite numeric vector.")
-    }
-    times <- sort(unique(times[times >= min(fit.times) & times <= max(fit.times)]))
-    if (length(times) == 0) {
-        stop("No `", label, "` remain within the fitted time range.")
-    }
-    matched <- sapply(times, function(t0) {
-        fit.times[min(which(fit.times >= t0))]
-    })
-    matched <- sort(unique(as.numeric(matched)))
-    if (!all(times %in% fit.times)) {
-        message(label, " not in fit.times were matched to the nearest later fitted time.")
-    }
-    matched
 }
 
 npsa_target.options <- function(psi.type = "hybrid", tau.type = "hybrid") {
