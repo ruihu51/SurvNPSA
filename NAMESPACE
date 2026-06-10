@@ -2,10 +2,13 @@
 
 S3method(plot,boundsdf)
 S3method(plot,npSurv)
+S3method(plot,npsa_times)
 S3method(summary,interpretRV)
 S3method(summary,npSurv)
+S3method(summary,npsa_times)
 S3method(summary,reportRV)
 export(interpret.RV)
+export(npsa_times)
 export(np_surv)
 export(np_surv.options)
 export(npsa_surv)

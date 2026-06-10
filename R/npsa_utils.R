@@ -1,3 +1,148 @@
+#' Check default analysis times
+#'
+#' This helper shows the default time grid that \code{\link{np_surv}()} and
+#' \code{\link{npsa_surv}()} would use when \code{fit.times} is not provided.
+#' It does not fit nuisance models or estimate treatment effects.
+#'
+#' @param time Numeric vector of event or censoring times.
+#' @param event Numeric vector of event indicators (1 = event, 0 = censored).
+#' @param fit.times Optional user-provided analysis times.
+#' @param nuisance.options Optional nuisance options. If
+#'   \code{nuisance.options$eval.times} is supplied, it is preserved.
+#' @param plot.times Optional reporting times. If \code{NULL}, all fitted times
+#'   are used.
+#' @param rv.times Optional RV/MIRV times. If \code{NULL}, \code{plot.times}
+#'   are used when supplied; otherwise about five representative fitted times
+#'   are used.
+#' @param max.fit.times Maximum number of automatic fitted times.
+#' @param max.eval.times Maximum number of automatic nuisance prediction times.
+#' @param G.cutoff Practical reverse-KM censoring-support cutoff for automatic
+#'   fitted times.
+#' @param verbose Logical; if TRUE, print a short message when automatic times
+#'   are chosen.
+#'
+#' @return A list of class \code{npsa_times} containing \code{fit.times},
+#'   \code{eval.times}, \code{plot.times}, \code{rv.times}, \code{time.info},
+#'   and \code{censor.df}.
+#'
+#' @examples
+#' \dontrun{
+#' time.out <- npsa_times(time, event)
+#' summary(time.out)
+#' plot(time.out)
+#'
+#' time.out <- npsa_times(time, event,
+#'                        fit.times = seq(0.1, 1.2, by = 0.1),
+#'                        plot.times = c(0.2, 0.6, 1.0),
+#'                        rv.times = c(0.2, 0.6, 1.0))
+#' summary(time.out)
+#'
+#' time.out <- npsa_times(time, event,
+#'                        fit.times = c(0.2, 0.4, 0.6, 0.8))
+#' summary(time.out)
+#' }
+#'
+#' @export
+npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
+                       plot.times = NULL, rv.times = NULL,
+                       max.fit.times = 50, max.eval.times = 200,
+                       G.cutoff = 0.05, verbose = FALSE) {
+
+    plot.times.user <- !is.null(plot.times)
+    time.rst <- .get.time.info(time, event, fit.times, nuisance.options,
+                               max.fit.times = max.fit.times,
+                               max.eval.times = max.eval.times,
+                               G.cutoff = G.cutoff,
+                               verbose = verbose)
+
+    fit.times <- time.rst$fit.times
+    eval.times <- time.rst$nuisance.options$eval.times
+    plot.times <- .get.report.times(plot.times, fit.times, default.all = TRUE,
+                                    label = "plot.times")
+
+    if (is.null(rv.times)) {
+        rv.times <- plot.times
+        if (!plot.times.user && length(rv.times) > 5) {
+            idx <- unique(round(seq(1, length(rv.times), length.out = 5)))
+            rv.times <- rv.times[idx]
+        }
+    } else {
+        rv.times <- .get.report.times(rv.times, fit.times, default.all = FALSE,
+                                      label = "rv.times")
+    }
+
+    out <- list(fit.times = fit.times,
+                eval.times = eval.times,
+                plot.times = plot.times,
+                rv.times = rv.times,
+                time.info = time.rst$time.info,
+                censor.df = time.rst$censor.df)
+    class(out) <- "npsa_times"
+    return(out)
+}
+
+#' Summarize default analysis times
+#'
+#' @param object An object returned by \code{\link{npsa_times}()}.
+#' @param digits Number of digits for printing.
+#' @param ... Additional arguments.
+#'
+#' @return Invisibly returns \code{object}.
+#'
+#' @export
+summary.npsa_times <- function(object, digits = 4, ...) {
+    .show.times <- function(x) {
+        paste(signif(x, digits), collapse = ", ")
+    }
+    cat("Default time setting\n")
+    cat("fit.times:", length(object$fit.times), "from",
+        signif(min(object$fit.times), digits), "to",
+        signif(max(object$fit.times), digits), "\n")
+    if (length(object$fit.times) <= 10) {
+        cat("fit.times values:", .show.times(object$fit.times), "\n")
+    }
+    cat("eval.times:", length(object$eval.times), "from",
+        signif(min(object$eval.times), digits), "to",
+        signif(max(object$eval.times), digits), "\n")
+    cat("plot.times:", length(object$plot.times), "\n")
+    if (length(object$plot.times) <= 10) {
+        cat("plot.times values:", .show.times(object$plot.times), "\n")
+    }
+    cat("rv.times:", .show.times(object$rv.times), "\n")
+    cat("fit.times source:", object$time.info$fit.times.source, "\n")
+    cat("upper time source:", object$time.info$upper.time.source, "\n")
+    cat("upper time:", signif(object$time.info$upper.time, digits), "\n")
+    if (!is.null(object$time.info$G.cutoff)) {
+        cat("G.cutoff:", object$time.info$G.cutoff, "\n")
+    }
+    invisible(object)
+}
+
+#' Plot default analysis time support
+#'
+#' @param x An object returned by \code{\link{npsa_times}()}.
+#' @param ... Additional arguments.
+#'
+#' @return A \code{ggplot} object.
+#'
+#' @export
+plot.npsa_times <- function(x, ...) {
+    if (is.null(x$censor.df)) {
+        stop("`x` does not contain censoring-support information.")
+    }
+    df <- x$censor.df
+    p <- ggplot2::ggplot(df, ggplot2::aes(x = time, y = G.hat)) +
+        ggplot2::geom_line(color = "black") +
+        ggplot2::geom_hline(yintercept = x$time.info$G.cutoff,
+                            linetype = "dashed", color = "red") +
+        ggplot2::geom_vline(xintercept = max(x$fit.times),
+                            linetype = "dotted", color = "blue") +
+        ggplot2::xlab("Time") +
+        ggplot2::ylab("Estimated censoring survival") +
+        ggplot2::theme_bw()
+    return(p)
+}
+
 #' Compute Effect Bounds (Internal)
 #'
 #' Internal utility function to compute the sensitivity analysis effect bounds.

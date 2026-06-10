@@ -92,6 +92,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     transform <- bound.options$transform
     scale <- bound.options$scale
     rv.times <- rv.options$rv.times
+    plot.times.user <- !is.null(plot.times)
     uniform.cutpoint <- rv.options$uniform.cutpoint
     rho <- rv.options$rho
     theta <- rv.options$theta
@@ -170,7 +171,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                     label = "plot.times")
     if (is.null(rv.times)) {
         rv.times <- plot.times
-        if (length(rv.times) > 5) {
+        if (!plot.times.user && length(rv.times) > 5) {
             idx <- unique(round(seq(1, length(rv.times), length.out = 5)))
             rv.times <- rv.times[idx]
         }
@@ -469,6 +470,7 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
                            G.cutoff = 0.05, verbose = FALSE) {
     if (is.null(nuisance.options)) nuisance.options <- list()
     time.info <- list()
+    censor.df <- NULL
 
     if (is.null(fit.times)) {
         if (sum(event == 1) == 0) {
@@ -483,6 +485,7 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
         if (length(all.times) == 0) {
             stop("No positive follow-up times available for default fit.times.")
         }
+        all.times.full <- all.times
 
         if (sum(event == 0) == 0) {
             G.hat <- rep(1, length(all.times))
@@ -511,6 +514,9 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
         }
         if (!is.finite(upper.time)) upper.time <- max(all.times)
 
+        censor.df <- data.frame(time = all.times.full,
+                                G.hat = as.numeric(G.hat),
+                                keep = all.times.full <= upper.time)
         all.times <- all.times[all.times <= upper.time]
         if (length(all.times) == 0) {
             all.times <- min(sort(unique(time[time > 0])))
@@ -554,6 +560,33 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
         time.info$n.all.times <- length(fit.times)
     }
 
+    if (is.null(censor.df) && sum(event == 1) > 0) {
+        max.event <- max(time[event == 1])
+        all.times <- sort(unique(time[time > 0 & time < max.event]))
+        if (length(all.times) == 0) {
+            all.times <- sort(unique(time[time > 0 & time <= max.event]))
+        }
+        if (length(all.times) > 0) {
+            if (sum(event == 0) == 0) {
+                G.hat <- rep(1, length(all.times))
+            } else {
+                G.fit <- tryCatch({
+                    survival::survfit(survival::Surv(time, 1 - event) ~ 1)
+                }, error = function(e) {
+                    NULL
+                })
+                G.hat <- tryCatch({
+                    summary(G.fit, times = all.times, extend = TRUE)$surv
+                }, error = function(e) {
+                    rep(NA_real_, length(all.times))
+                })
+            }
+            censor.df <- data.frame(time = all.times,
+                                    G.hat = as.numeric(G.hat),
+                                    keep = all.times <= max(fit.times))
+        }
+    }
+
     if (is.null(nuisance.options$eval.times)) {
         eval.times <- sort(unique(time[time > 0 & time <= max(fit.times)]))
         if (length(eval.times) > max.eval.times) {
@@ -575,7 +608,8 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
 
     list(fit.times = fit.times,
          nuisance.options = nuisance.options,
-         time.info = time.info)
+         time.info = time.info,
+         censor.df = censor.df)
 }
 
 .get.report.times <- function(times, fit.times, default.all = TRUE,
