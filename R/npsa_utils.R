@@ -521,7 +521,39 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
     } else {
       lower.b <- ifelse(l.sp.0 > 0, TRUE, FALSE)
       bounds.int.RV <- tryCatch({
-        uniroot(bounds.senspar, c(0,0.99), tol = 0.0001, lower.b = lower.b)$root
+        x.grid <- unique(c(0, seq(0.0001, 0.99, length.out = 200)))
+        bounds.vals <- sapply(x.grid, function(x) {
+          tryCatch({
+            out <- bounds.senspar(x, lower.b = lower.b)
+            ifelse(length(out) == 1 && is.finite(out), out, NA)
+          }, error = function(e) {
+            NA
+          })
+        })
+        bounds.vals[!is.finite(bounds.vals)] <- NA
+
+        change.idx <- which(
+          !is.na(bounds.vals[-length(bounds.vals)]) &
+            !is.na(bounds.vals[-1]) &
+            bounds.vals[-length(bounds.vals)] * bounds.vals[-1] <= 0
+        )
+
+        if (length(change.idx) == 0) {
+          message("MIRV could not be computed: no finite sensitivity value in [0, 0.99] moved the pointwise confidence bound to the hypothesized effect.")
+          NA
+        } else {
+          idx <- change.idx[1]
+          if (bounds.vals[idx] == 0) {
+            x.grid[idx]
+          } else if (bounds.vals[idx + 1] == 0) {
+            x.grid[idx + 1]
+          } else {
+            uniroot(bounds.senspar, c(x.grid[idx], x.grid[idx + 1]),
+                    tol = 0.0001, lower.b = lower.b,
+                    f.lower = bounds.vals[idx],
+                    f.upper = bounds.vals[idx + 1])$root
+          }
+        }
       }, error = function(e) {
         message("An error occurred: ", e$message)
         NA
