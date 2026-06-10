@@ -14,7 +14,8 @@
   rho = 1,
   theta = 0,
   conf.level = 0.95,
-  seed = 6741
+  seed = 6741,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -23,6 +24,8 @@
 \item{rho}{Correlation parameter.}
 
 \item{theta}{Hypothesized effect value.}
+
+\item{verbose}{Logical; if TRUE, print uniform RV messages.}
 }
 \value{
 Numeric value representing the uniform robustness value.

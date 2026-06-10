@@ -9,7 +9,7 @@ np_surv(
   event,
   treat,
   confounders,
-  fit.times,
+  fit.times = NULL,
   nuisance.options = list(),
   np.options = list(),
   result = NULL,
@@ -27,7 +27,9 @@ np_surv(
 
 \item{confounders}{Matrix or data frame of observed confounders.}
 
-\item{fit.times}{Numeric vector of times for survival estimation.}
+\item{fit.times}{Optional numeric vector of times for survival estimation.
+If \code{NULL}, a compact default grid is chosen from the observed
+follow-up times.}
 
 \item{nuisance.options}{List of options for nuisance estimation.}
 
@@ -42,11 +44,19 @@ np_surv(
 \item{save}{Logical; if TRUE, save intermediate result to \code{dev/result.RData}.}
 }
 \value{
-A list of class \code{npSurv}.
+A list of class \code{npSurv}, including \code{time.info} with the
+selected analysis and nuisance time grids.
 }
 \description{
 Estimate the adjusted survival results under no unobserved confounding.
 This user-facing wrapper reuses the same nuisance and observed-component
 pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
 survival curves and common CFsurvival-style contrasts.
+}
+\details{
+If \code{fit.times} is not supplied, the function chooses a compact analysis
+grid from positive observed follow-up times before the largest observed event
+time, following the CFsurvival default idea. Most users do not need to set
+\code{nuisance.options$eval.times}; it is an internal prediction grid and is
+chosen automatically when omitted.
 }

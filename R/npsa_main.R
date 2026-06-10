@@ -4,11 +4,22 @@
 #' nonparametric sensitivity analysis under unmeasured confounding, optionally
 #' including restricted mean survival time (RMST) analysis and robustness value computation.
 #'
+#' If \code{fit.times} is not supplied, the function chooses a compact analysis
+#' grid from positive observed follow-up times before the largest observed event
+#' time, following the CFsurvival default idea. For large data, this grid is
+#' reduced to representative times and capped before the tail where overall
+#' censoring support is very weak. The censoring-support cutoff is a practical
+#' safety default, not a change to the statistical formulas. Most users do not
+#' need to set \code{nuisance.options$eval.times}; it is an internal prediction
+#' grid and is chosen automatically when omitted.
+#'
 #' @param time Numeric vector of event or censoring times.
 #' @param event Numeric vector of event indicators (1 = event, 0 = censored).
 #' @param treat Numeric vector of treatment assignment indicators (1 = treated, 0 = control).
 #' @param confounders Matrix or data frame of observed confounders (observed covariates).
-#' @param fit.times Numeric vector of times at which nuisance estimators are fit.
+#' @param fit.times Optional numeric vector of times at which the survival
+#'   contrasts are estimated. If \code{NULL}, a compact default grid is chosen
+#'   from the observed follow-up times.
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param target.options List of options for target parameter estimation.
 #'   May include \code{psi.type} and \code{tau.type}.
@@ -18,6 +29,8 @@
 #'   \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
 #'   The \code{uniform.cutpoint} option follows the CFsurvival-style window:
 #'   lower event-time quantile and upper survival cutoff.
+#'   If \code{rv.times = NULL}, RV/MIRV are computed at about five
+#'   representative fitted times.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
@@ -33,8 +46,9 @@
 #'   \item{result}{Estimated observable components and IFs, such as observed survival differences and rmst differences.}
 #'   \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 #'   \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
-#'   \item{res.RV}{Robustness values at specified times (if \code{rv.times} is given).}
+#'   \item{res.RV}{Robustness values at specified or default representative times.}
 #'   \item{var_names}{Confounder names used by interpretation helpers.}
+#'   \item{time.info}{Time grids used for analysis and nuisance estimation.}
 #' }
 #'
 #' @examples
@@ -46,17 +60,17 @@
 #'   event = dat$D,
 #'   treat = dat$A,
 #'   confounders = dat$W,
-#'   fit.times = seq(0.5, 10, by = 0.5)
+#'   rmst = FALSE
 #' )
 #' }
 #'
 #' @export
-npsa_surv <- function(time, event, treat, confounders, fit.times,
+npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                       nuisance.options = list(),
                       target.options = list(),
                       bound.options = list(),
                       rv.options = list(),
-                      rmst = TRUE,
+                      rmst = FALSE,
                       rmst.options = list(),
                       sens.options = list(),
                       result = NULL,
@@ -101,6 +115,17 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     if (length(var_names) != n_var) {
         stop("`var_names` must have one name for each confounder.")
     }
+    fit.times.source <- NULL
+    if (is.null(fit.times) && !is.null(result$fit.times)) {
+        fit.times <- result$fit.times
+        fit.times.source <- "result"
+    }
+    time.rst <- .get.time.info(time, event, fit.times, nuisance.options,
+                               verbose = verbose)
+    fit.times <- time.rst$fit.times
+    nuisance.options <- time.rst$nuisance.options
+    time.info <- time.rst$time.info
+    if (!is.null(fit.times.source)) time.info$fit.times.source <- fit.times.source
 
     # Nuisance Estimation
     if (verbose) cat("Start estimating nuisances:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -120,6 +145,10 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
         if (save) save(result, file = "dev/result.RData")
     }
     if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
+    time.info$fit.times <- result$fit.times
+    time.info$eval.times <- result$nuisance$eval.times
+    time.info$n.fit.times <- length(result$fit.times)
+    time.info$n.eval.times <- length(result$nuisance$eval.times)
 
     # RMST Estimation if requested
     if (rmst) {
@@ -137,6 +166,20 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
+                                    label = "plot.times")
+    if (is.null(rv.times)) {
+        rv.times <- plot.times
+        if (length(rv.times) > 5) {
+            idx <- unique(round(seq(1, length(rv.times), length.out = 5)))
+            rv.times <- rv.times[idx]
+        }
+    } else {
+        rv.times <- .get.report.times(rv.times, result$fit.times, default.all = FALSE,
+                                      label = "rv.times")
+    }
+    time.info$plot.times <- plot.times
+    time.info$rv.times <- rv.times
     bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform, scale = scale)
 
     # Simulate sensitivity parameters if needed
@@ -187,10 +230,10 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
     # }
 
     out <- list(result = result, senspar.df = senspar.df, bounds.df = bounds.df,
-                var_names = var_names)
+                var_names = var_names, time.info = time.info)
 
     # Robustness Values computations
-    if (!is.null(rv.times)) {
+    if (length(rv.times) > 0) {
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
         surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
@@ -202,6 +245,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 
         out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
                                  transform = transform,
+                                 verbose = verbose,
                                  unif = TRUE, t.lower = t.lower, t.upper = t.upper)
     }
 
@@ -221,11 +265,19 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 #' pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
 #' survival curves and common CFsurvival-style contrasts.
 #'
+#' If \code{fit.times} is not supplied, the function chooses a compact analysis
+#' grid from positive observed follow-up times before the largest observed event
+#' time, following the CFsurvival default idea. Most users do not need to set
+#' \code{nuisance.options$eval.times}; it is an internal prediction grid and is
+#' chosen automatically when omitted.
+#'
 #' @param time Numeric vector of event or censoring times.
 #' @param event Numeric vector of event indicators (1 = event, 0 = censored).
 #' @param treat Numeric vector of treatment assignment indicators (1 = treated, 0 = control).
 #' @param confounders Matrix or data frame of observed confounders.
-#' @param fit.times Numeric vector of times for survival estimation.
+#' @param fit.times Optional numeric vector of times for survival estimation.
+#'   If \code{NULL}, a compact default grid is chosen from the observed
+#'   follow-up times.
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param np.options List of options from \code{\link{np_surv.options}()}.
 #' @param result Optional precomputed result object containing nuisances or observed components.
@@ -233,10 +285,11 @@ npsa_surv <- function(time, event, treat, confounders, fit.times,
 #' @param verbose Logical; if TRUE, print progress messages.
 #' @param save Logical; if TRUE, save intermediate result to \code{dev/result.RData}.
 #'
-#' @return A list of class \code{npSurv}.
+#' @return A list of class \code{npSurv}, including \code{time.info} with the
+#'   selected analysis and nuisance time grids.
 #'
 #' @export
-np_surv <- function(time, event, treat, confounders, fit.times,
+np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                     nuisance.options = list(),
                     np.options = list(),
                     result = NULL,
@@ -266,6 +319,17 @@ np_surv <- function(time, event, treat, confounders, fit.times,
     if (length(var_names) != n_var) {
         stop("`var_names` must have one name for each confounder.")
     }
+    fit.times.source <- NULL
+    if (is.null(fit.times) && !is.null(result$fit.times)) {
+        fit.times <- result$fit.times
+        fit.times.source <- "result"
+    }
+    time.rst <- .get.time.info(time, event, fit.times, nuisance.options,
+                               verbose = verbose)
+    fit.times <- time.rst$fit.times
+    nuisance.options <- time.rst$nuisance.options
+    time.info <- time.rst$time.info
+    if (!is.null(fit.times.source)) time.info$fit.times.source <- fit.times.source
     if (is.null(seed)) seed <- sample(1:1e8, 1)
     set.seed(seed)
     np.options$seed <- seed
@@ -287,11 +351,14 @@ np_surv <- function(time, event, treat, confounders, fit.times,
         if (save) save(result, file = "dev/result.RData")
     }
     if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
+    time.info$fit.times <- result$fit.times
+    time.info$eval.times <- result$nuisance$eval.times
+    time.info$n.fit.times <- length(result$fit.times)
+    time.info$n.eval.times <- length(result$nuisance$eval.times)
 
-    if (is.null(plot.times)) plot.times <- result$fit.times
-    plot.times <- plot.times[plot.times >= min(result$fit.times) &
-                                 plot.times <= max(result$fit.times)]
-    if (length(plot.times) == 0) stop("No `plot.times` remain within the fitted time range.")
+    plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
+                                    label = "plot.times")
+    time.info$plot.times <- plot.times
 
     # Treatment-specific survival and survival contrasts
     cf.out <- .np_report_cf_surv(time, event, treat, result,
@@ -313,6 +380,7 @@ np_surv <- function(time, event, treat, confounders, fit.times,
                   ci.summary = ci.summary,
                   plot.times = plot.times,
                   var_names = var_names,
+                  time.info = time.info,
                   options = list(np.options = np.options)),
              cf.out)
 
@@ -324,6 +392,7 @@ np_surv <- function(time, event, treat, confounders, fit.times,
 #' Options for \code{np_surv()}
 #'
 #' @param plot.times Optional numeric vector of times to summarize and plot.
+#'   If \code{NULL}, all fitted times are used.
 #' @param conf.band Logical; if TRUE, compute uniform confidence bands.
 #' @param conf.level Desired confidence level.
 #' @param contrasts Character vector of contrasts to report. Options are
@@ -395,11 +464,148 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
          seed = seed)
 }
 
+.get.time.info <- function(time, event, fit.times, nuisance.options,
+                           max.fit.times = 50, max.eval.times = 200,
+                           G.cutoff = 0.05, verbose = FALSE) {
+    if (is.null(nuisance.options)) nuisance.options <- list()
+    time.info <- list()
+
+    if (is.null(fit.times)) {
+        if (sum(event == 1) == 0) {
+            stop("No uncensored events; cannot choose default fit.times.")
+        }
+
+        max.event <- max(time[event == 1])
+        all.times <- sort(unique(time[time > 0 & time < max.event]))
+        if (length(all.times) == 0) {
+            all.times <- sort(unique(time[time > 0 & time <= max.event]))
+        }
+        if (length(all.times) == 0) {
+            stop("No positive follow-up times available for default fit.times.")
+        }
+
+        if (sum(event == 0) == 0) {
+            G.hat <- rep(1, length(all.times))
+        } else {
+            G.fit <- tryCatch({
+                survival::survfit(survival::Surv(time, 1 - event) ~ 1)
+            }, error = function(e) {
+                NULL
+            })
+            G.hat <- tryCatch({
+                summary(G.fit, times = all.times, extend = TRUE)$surv
+            }, error = function(e) {
+                rep(NA_real_, length(all.times))
+            })
+        }
+
+        keep.idx <- which(is.finite(G.hat) & G.hat >= G.cutoff)
+        upper.type <- "G.cutoff"
+        if (length(keep.idx) == 0) {
+            event.times <- sort(unique(time[event == 1 & time > 0]))
+            upper.time <- as.numeric(stats::quantile(event.times, probs = 0.95,
+                                                     type = 1, na.rm = TRUE))
+            upper.type <- "event.quantile"
+        } else {
+            upper.time <- max(all.times[keep.idx])
+        }
+        if (!is.finite(upper.time)) upper.time <- max(all.times)
+
+        all.times <- all.times[all.times <= upper.time]
+        if (length(all.times) == 0) {
+            all.times <- min(sort(unique(time[time > 0])))
+        }
+        fit.times <- all.times
+        if (length(fit.times) > max.fit.times) {
+            idx <- unique(round(seq(1, length(fit.times), length.out = max.fit.times)))
+            fit.times <- fit.times[idx]
+        }
+
+        time.info$fit.times.source <- "automatic"
+        time.info$upper.time.source <- upper.type
+        time.info$upper.time <- max(fit.times)
+        time.info$G.cutoff <- G.cutoff
+        time.info$n.all.times <- length(all.times)
+        if (verbose) {
+            message("Using automatic fit.times with ", length(fit.times),
+                    " time points up to ", signif(max(fit.times), 4), ".")
+        }
+    } else {
+        if (!is.numeric(fit.times) || any(!is.finite(fit.times))) {
+            stop("`fit.times` must be NULL or a finite numeric vector.")
+        }
+        fit.times <- sort(unique(fit.times))
+        if (any(fit.times <= 0)) {
+            fit.times <- fit.times[fit.times > 0]
+            message("fit.times <= 0 removed.")
+        }
+        if (sum(event == 1) == 0) stop("No uncensored events; cannot perform estimation.")
+        if (any(fit.times > max(time[event == 1]))) {
+            fit.times <- fit.times[fit.times <= max(time[event == 1])]
+            message("fit.times > max(time[event == 1]) removed.")
+        }
+        if (length(fit.times) == 0) {
+            stop("No `fit.times` remain within the observed event-time range.")
+        }
+        time.info$fit.times.source <- "user"
+        time.info$upper.time.source <- "user"
+        time.info$upper.time <- max(fit.times)
+        time.info$G.cutoff <- G.cutoff
+        time.info$n.all.times <- length(fit.times)
+    }
+
+    if (is.null(nuisance.options$eval.times)) {
+        eval.times <- sort(unique(time[time > 0 & time <= max(fit.times)]))
+        if (length(eval.times) > max.eval.times) {
+            idx <- unique(round(seq(1, length(eval.times), length.out = max.eval.times)))
+            eval.times <- eval.times[idx]
+        }
+        nuisance.options$eval.times <- sort(unique(c(0, eval.times, max(fit.times))))
+        time.info$eval.times.source <- "automatic"
+    } else {
+        time.info$eval.times.source <- "user"
+    }
+
+    time.info$fit.times <- fit.times
+    time.info$eval.times <- nuisance.options$eval.times
+    time.info$n.fit.times <- length(fit.times)
+    time.info$n.eval.times <- length(nuisance.options$eval.times)
+    time.info$max.fit.times <- max.fit.times
+    time.info$max.eval.times <- max.eval.times
+
+    list(fit.times = fit.times,
+         nuisance.options = nuisance.options,
+         time.info = time.info)
+}
+
+.get.report.times <- function(times, fit.times, default.all = TRUE,
+                              label = "plot.times") {
+    if (is.null(times)) {
+        if (default.all) return(fit.times)
+        return(numeric(0))
+    }
+    if (!is.numeric(times) || any(!is.finite(times))) {
+        stop("`", label, "` must be NULL or a finite numeric vector.")
+    }
+    times <- sort(unique(times[times >= min(fit.times) & times <= max(fit.times)]))
+    if (length(times) == 0) {
+        stop("No `", label, "` remain within the fitted time range.")
+    }
+    matched <- sapply(times, function(t0) {
+        fit.times[min(which(fit.times >= t0))]
+    })
+    matched <- sort(unique(as.numeric(matched)))
+    if (!all(times %in% fit.times)) {
+        message(label, " not in fit.times were matched to the nearest later fitted time.")
+    }
+    matched
+}
+
 npsa_target.options <- function(psi.type = "hybrid", tau.type = "hybrid") {
     list(psi.type = psi.type, tau.type = tau.type)
 }
 
-npsa_bound.options <- function(plot.times = c(0.5, 0.8, 1.2), transform = TRUE, scale = TRUE) {
+npsa_bound.options <- function(plot.times = NULL, transform = TRUE, scale = TRUE) {
     list(plot.times = plot.times, transform = transform, scale = scale)
 }
 
@@ -409,7 +615,7 @@ npsa_rv.options <- function(rv.times = NULL, uniform.cutpoint = c(0.01, 0.99),
          rho = rho, theta = theta)
 }
 
-npsa_rmst.options <- function(fit.times.rmst = c(0.5, 0.7, 2), gamma.type = "hybrid",
+npsa_rmst.options <- function(fit.times.rmst = NULL, gamma.type = "hybrid",
                               max_gap = 0.2, tol = 0.01, tol1 = 0.01, tol2 = 0.01) {
     list(fit.times.rmst = fit.times.rmst, gamma.type = gamma.type,
          max_gap = max_gap, tol = tol, tol1 = tol1, tol2 = tol2)

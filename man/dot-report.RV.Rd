@@ -11,6 +11,7 @@
   theta = 0,
   conf.level = 0.95,
   transform = FALSE,
+  verbose = FALSE,
   unif = TRUE,
   t.lower,
   t.upper
@@ -18,6 +19,8 @@
 }
 \arguments{
 \item{transform}{Logical; whether to use transformed pointwise MIRV calculation.}
+
+\item{verbose}{Logical; if TRUE, print pointwise and uniform RV messages.}
 }
 \description{
 Report Robustness Values

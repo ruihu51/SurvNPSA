@@ -1,11 +1,12 @@
 #' Report Robustness Values
 #'
 #' @param transform Logical; whether to use transformed pointwise MIRV calculation.
+#' @param verbose Logical; if TRUE, print pointwise and uniform RV messages.
 #'
 #' @keywords internal
 .report.RV <- function(rv.times, result, rho = 1, theta = 0,
                        conf.level = .95, transform = FALSE,
-                       unif = TRUE, t.lower, t.upper) {
+                       verbose = FALSE, unif = TRUE, t.lower, t.upper) {
   res.list <- list()
 
   if (any(rv.times > max(result$fit.times))) {
@@ -26,7 +27,8 @@
       rho = rho,
       theta = theta,
       transform = transform,
-      conf.level = conf.level
+      conf.level = conf.level,
+      verbose = verbose
     )
 
     res.list[[length(res.list) + 1]] <- list(
@@ -56,7 +58,8 @@
       IF.vals.tau = result$IF.vals.tau,
       rho = rho,
       theta = theta,
-      conf.level = conf.level
+      conf.level = conf.level,
+      verbose = verbose
     )
     out$unif.RV <- unif.RV
     out$unif.idx <- unif.idx
@@ -117,7 +120,7 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
         stop("`object` must be an object returned by `npsa_surv()`.")
     }
     if (is.null(object$res.RV)) {
-        stop("`object` does not contain RV results. Please run `npsa_surv()` with `rv.options$rv.times`.")
+        stop("`object` does not contain RV results. Please run `npsa_surv()` with default RV times or provide `rv.options$rv.times`.")
     }
     if (is.null(object$senspar.df$sens.df) || is.null(object$senspar.df$sens.df.mean)) {
         stop("`object` does not contain sensitivity parameter results for RV interpretation.")
@@ -484,6 +487,7 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
                            sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
                            rmst = TRUE, sens.rmst.df.mean = NULL, transform = TRUE, scale = TRUE) {
 
+    if (is.null(plot.times)) plot.times <- result$fit.times
     if (any(plot.times > max(result$fit.times))) {
         message("Some plot.times > maximum observed event time - removed for plot.")
         plot.times <- plot.times[plot.times <= max(result$fit.times)]

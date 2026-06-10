@@ -9,12 +9,12 @@ npsa_surv(
   event,
   treat,
   confounders,
-  fit.times,
+  fit.times = NULL,
   nuisance.options = list(),
   target.options = list(),
   bound.options = list(),
   rv.options = list(),
-  rmst = TRUE,
+  rmst = FALSE,
   rmst.options = list(),
   sens.options = list(),
   result = NULL,
@@ -32,7 +32,9 @@ npsa_surv(
 
 \item{confounders}{Matrix or data frame of observed confounders (observed covariates).}
 
-\item{fit.times}{Numeric vector of times at which nuisance estimators are fit.}
+\item{fit.times}{Optional numeric vector of times at which the survival
+contrasts are estimated. If \code{NULL}, a compact default grid is chosen
+from the observed follow-up times.}
 
 \item{nuisance.options}{List of options for nuisance estimation.}
 
@@ -45,7 +47,9 @@ The \code{transform} option is also used for pointwise MIRV calculation.}
 \item{rv.options}{List of options for robustness value computation. May include
 \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
 The \code{uniform.cutpoint} option follows the CFsurvival-style window:
-lower event-time quantile and upper survival cutoff.}
+lower event-time quantile and upper survival cutoff.
+If \code{rv.times = NULL}, RV/MIRV are computed at about five
+representative fitted times.}
 
 \item{rmst}{Logical; if TRUE, estimate RMST and its bounds inference as well.}
 
@@ -69,14 +73,25 @@ A list of class \code{npsa_surv} containing:
 \item{result}{Estimated observable components and IFs, such as observed survival differences and rmst differences.}
 \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
-\item{res.RV}{Robustness values at specified times (if \code{rv.times} is given).}
+\item{res.RV}{Robustness values at specified or default representative times.}
 \item{var_names}{Confounder names used by interpretation helpers.}
+\item{time.info}{Time grids used for analysis and nuisance estimation.}
 }
 }
 \description{
 This function estimates the treatment effect on survival outcomes with
 nonparametric sensitivity analysis under unmeasured confounding, optionally
 including restricted mean survival time (RMST) analysis and robustness value computation.
+}
+\details{
+If \code{fit.times} is not supplied, the function chooses a compact analysis
+grid from positive observed follow-up times before the largest observed event
+time, following the CFsurvival default idea. For large data, this grid is
+reduced to representative times and capped before the tail where overall
+censoring support is very weak. The censoring-support cutoff is a practical
+safety default, not a change to the statistical formulas. Most users do not
+need to set \code{nuisance.options$eval.times}; it is an internal prediction
+grid and is chosen automatically when omitted.
 }
 \examples{
 # Simulate toy data and fit sensitivity bounds (see package vignettes for full examples)
@@ -87,7 +102,7 @@ out <- npsa_surv(
   event = dat$D,
   treat = dat$A,
   confounders = dat$W,
-  fit.times = seq(0.5, 10, by = 0.5)
+  rmst = FALSE
 )
 }
 

@@ -270,13 +270,15 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 #' @param theta.obs Numeric vector of observed treatment effect estimates.
 #' @param rho Correlation parameter.
 #' @param theta Hypothesized effect value.
+#' @param verbose Logical; if TRUE, print uniform RV messages.
 #'
 #' @return Numeric value representing the uniform robustness value.
 #'
 #' @keywords internal
 .get.uniform.RV <- function(theta.obs, psi, tau,
                             IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
-                            rho=1, theta=0, conf.level=.95, seed=6741){
+                            rho=1, theta=0, conf.level=.95, seed=6741,
+                            verbose=TRUE){
   set.seed(seed)
 
   # p-value under observed data
@@ -293,11 +295,11 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
   dist.null <- apply(epsilon, 1, function(x) {max(abs(x))})
 
   pvalue <- mean(dist.null > test.stat)
-  cat("The p-value under no unobserved confounding is:", pvalue, "\n")
+  if (verbose) cat("The p-value under no unobserved confounding is:", pvalue, "\n")
 
   if (pvalue < 1-conf.level) {
 
-    message("Proceed to the test under unobserved confounding...")
+    if (verbose) message("Proceed to the test under unobserved confounding...")
     .get.pvalue.sens <- function(x){
       # IF function
       sens.all <- (x/sqrt(1-x))*abs(rho)
@@ -338,7 +340,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
       NA
     })
   } else {
-    message("The null hypothesis that the observed effect is zero cannot be rejected. Sensitivity analysis will not proceed.")
+    if (verbose) message("The null hypothesis that the observed effect is zero cannot be rejected. Sensitivity analysis will not proceed.")
     uniform.RV <- NA
   }
 
@@ -515,7 +517,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
     if (verbose) cat("pointwise confidence interval for theta.obs.t0 when sensitivity parameters are 0:", c(l.sp.0, u.sp.0), "\n")
 
     if (l.sp.0 <= 0 & u.sp.0 >= 0) {
-      message("Pointwise CI cover the hypothesized value of theta; robustness values calculation for the lower/upper limit unnecessary.")
+      if (verbose) message("Pointwise CI cover the hypothesized value of theta; robustness values calculation for the lower/upper limit unnecessary.")
       bounds.int.RV <- 0
       lower.b <- NULL
     } else {
@@ -539,7 +541,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
         )
 
         if (length(change.idx) == 0) {
-          message("MIRV could not be computed: no finite sensitivity value in [0, 0.99] moved the pointwise confidence bound to the hypothesized effect.")
+          if (verbose) message("MIRV could not be computed: no finite sensitivity value in [0, 0.99] moved the pointwise confidence bound to the hypothesized effect.")
           NA
         } else {
           idx <- change.idx[1]
@@ -555,7 +557,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
           }
         }
       }, error = function(e) {
-        message("An error occurred: ", e$message)
+        if (verbose) message("An error occurred: ", e$message)
         NA
       })
     }

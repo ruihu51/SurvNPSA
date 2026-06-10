@@ -15,7 +15,8 @@ np_surv.options(
 )
 }
 \arguments{
-\item{plot.times}{Optional numeric vector of times to summarize and plot.}
+\item{plot.times}{Optional numeric vector of times to summarize and plot.
+If \code{NULL}, all fitted times are used.}
 
 \item{conf.band}{Logical; if TRUE, compute uniform confidence bands.}
 
