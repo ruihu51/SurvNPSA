@@ -780,8 +780,7 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 
   if (conf.bounds){
     n <- dim(IF.vals.theta.obs)[1]
-    library(mvtnorm)
-    epsilon.base <- rmvnorm(n=boot, mean=rep(0, 2), sigma = diag(2))
+    epsilon.base <- matrix(stats::rnorm(boot * n), nrow = boot, ncol = n)
 
     # pointwise confidence intervals as function of sensitivity parameters
     bounds.senspar <- function(x, lower.b=TRUE){
@@ -791,35 +790,20 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
       IF.vals.effect.lower <- IF.vals.theta.obs[,k] - inner.func.2
       IF.vals.effect.upper <- IF.vals.theta.obs[,k] + inner.func.2
 
-      sigma2.l <- mean(IF.vals.effect.lower^2)
-      sigma2.ul <- mean(IF.vals.effect.lower*IF.vals.effect.upper)
-      sigma2.u <- mean(IF.vals.effect.upper^2)
-
       effect.lower.sp <- theta.obs.t0 - abs(rho)*sqrt(psi.t0)*sqrt(tau)*(x/sqrt(1-x))
       effect.upper.sp <- theta.obs.t0 + abs(rho)*sqrt(psi.t0)*sqrt(tau)*(x/sqrt(1-x))
 
-      library(mvtnorm)
       if (!transform){
-          cov.matrix <- matrix(c(sigma2.l, sigma2.ul, sigma2.ul, sigma2.u),
-                               nrow = 2, byrow = TRUE)
+          IF.vals.effect <- cbind(IF.vals.effect.lower, IF.vals.effect.upper)
       } else {
-          sigma2.trans.l <- (2/(1-effect.lower.sp^2))^2*sigma2.l
-          sigma2.trans.ul <- (4/((1-effect.lower.sp^2)*(1-effect.upper.sp^2)))*sigma2.ul
-          sigma2.trans.u <- (2/(1-effect.upper.sp^2))^2*sigma2.u
-
-          cov.matrix <- matrix(c(sigma2.trans.l, sigma2.trans.ul, sigma2.trans.ul, sigma2.trans.u),
-                               nrow = 2, byrow = TRUE)
+          IF.vals.effect <- cbind(IF.vals.effect.lower * (2/(1-effect.lower.sp^2)),
+                                  IF.vals.effect.upper * (2/(1-effect.upper.sp^2)))
 
           trans.log <- function(x) log(1+x) - log(1-x)
           trans.log.inv <- function(x) (exp(x)-1)/(exp(x)+1)
       }
 
-
-      cov.eigen <- eigen(cov.matrix, symmetric = TRUE)
-      cov.sqrt <- cov.eigen$vectors %*%
-          diag(sqrt(pmax(cov.eigen$values, 0)), nrow = 2) %*%
-          t(cov.eigen$vectors)
-      epsilon <- epsilon.base %*% cov.sqrt
+      epsilon <- (epsilon.base / sqrt(n)) %*% IF.vals.effect
       epsilon[,2] <- - epsilon[,2]
       c_alpha <- unname(quantile(apply(epsilon, 1, max), conf.level))
 
