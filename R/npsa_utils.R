@@ -577,6 +577,13 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
   if (time.zero) {
     new_row <- as.data.frame(list(0, d, 0, 0, 0, 0, 0, 0, 0))
     names(new_row) <- names(bounds.df)
+    if (transform) {
+      new_row$uniform.trans.lower <- NA
+      new_row$uniform.trans.upper <- NA
+    } else {
+      new_row$uniform.bounds.lower <- NA
+      new_row$uniform.bounds.upper <- NA
+    }
 
     bounds.df <- rbind(bounds.df, new_row)
   }
