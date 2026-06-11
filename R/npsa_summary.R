@@ -439,6 +439,10 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
 }
 
 .plot.np_contrast <- function(x, type, uniform = TRUE) {
+    if (type == "surv.diff" && "times" %in% names(x$surv.diff.df)) {
+        return(.plot.np_surv_diff_bounds(x$surv.diff.df, uniform = uniform))
+    }
+
     map <- list(
         "surv.diff" = list(df = x$surv.diff.df, est = "surv.diff",
                            ylab = "Survival difference (treatment - control)", ref = 0),
@@ -476,6 +480,51 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
 
     if (is.finite(info$ref)) {
         p <- p + geom_hline(yintercept = info$ref, color = "grey45", linetype = "dotted")
+    }
+    return(p)
+}
+
+.plot.np_surv_diff_bounds <- function(df, uniform = TRUE) {
+    if ("ptwise.trans.lower" %in% names(df)) {
+        ptwise.lower <- "ptwise.trans.lower"
+        ptwise.upper <- "ptwise.trans.upper"
+        unif.lower <- "uniform.trans.lower"
+        unif.upper <- "uniform.trans.upper"
+    } else {
+        ptwise.lower <- "ptwise.bounds.lower"
+        ptwise.upper <- "ptwise.bounds.upper"
+        unif.lower <- "uniform.bounds.lower"
+        unif.upper <- "uniform.bounds.upper"
+    }
+
+    df$ptwise.plot.lower <- df[[ptwise.lower]]
+    df$ptwise.plot.upper <- df[[ptwise.upper]]
+    df$uniform.plot.lower <- df[[unif.lower]]
+    df$uniform.plot.upper <- df[[unif.upper]]
+
+    p <- ggplot(df, aes(x = times)) +
+        geom_line(aes(y = theta.obs, color = "Estimate"), na.rm = TRUE) +
+        geom_line(aes(y = ptwise.plot.lower, color = "Pointwise CI"),
+                  linetype = "dashed", na.rm = TRUE) +
+        geom_line(aes(y = ptwise.plot.upper, color = "Pointwise CI"),
+                  linetype = "dashed", na.rm = TRUE) +
+        geom_hline(yintercept = 0, color = "grey45", linetype = "dotted") +
+        scale_color_manual(values = c("Estimate" = "black",
+                                      "Pointwise CI" = "#0072B2",
+                                      "Uniform Band" = "#009E73")) +
+        xlab("Time") +
+        ylab("Survival difference (treatment - control)") +
+        theme_bw() +
+        theme(legend.position = "bottom",
+              legend.title = element_blank(),
+              panel.grid.minor = element_blank())
+
+    if (isTRUE(uniform)) {
+        p <- p +
+            geom_line(aes(y = uniform.plot.lower, color = "Uniform Band"),
+                      linetype = "longdash", na.rm = TRUE) +
+            geom_line(aes(y = uniform.plot.upper, color = "Uniform Band"),
+                      linetype = "longdash", na.rm = TRUE)
     }
     return(p)
 }

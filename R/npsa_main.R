@@ -305,7 +305,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #' Estimate the adjusted survival results under no unobserved confounding.
 #' This user-facing wrapper reuses the same nuisance and observed-component
 #' pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
-#' survival curves and common CFsurvival-style contrasts.
+#' survival curves, the survival-difference \code{sp = 0} bounds dataframe,
+#' and common CFsurvival-style contrasts not defined by the sensitivity target.
 #'
 #' If \code{fit.times} is not supplied, the function chooses a compact analysis
 #' grid from positive observed follow-up times before the largest observed event
@@ -404,13 +405,23 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     time.info$plot.times <- plot.times
 
     # Treatment-specific survival and survival contrasts
+    cf.contrasts <- setdiff(contrasts, "surv.diff")
     cf.out <- .np_report_cf_surv(time, event, treat, result,
                                  conf.band = conf.band,
                                  conf.level = conf.level,
-                                 contrasts = contrasts,
+                                 contrasts = cf.contrasts,
                                  uniform.cutpoint = uniform.cutpoint,
                                  uniform.window = uniform.window,
                                  isotonize = isotonize)
+
+    # Survival difference is the zero-sensitivity special case of SurvNPSA.
+    surv.diff.out <- .report.bounds(result$fit.times, result,
+                                    rmst = FALSE,
+                                    transform = TRUE,
+                                    scale = TRUE,
+                                    band.end.pts = cf.out$band.end.pts,
+                                    conf.level = conf.level)
+    cf.out$surv.diff.df <- surv.diff.out$bounds.df
 
     # Uniform test for no observed survival difference
     uniform.test <- .np_uniform_test(result, time, event,
