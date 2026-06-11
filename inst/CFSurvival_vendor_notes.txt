@@ -68,6 +68,14 @@ Intentional local modifications:
   window, with c(0.01, 0.99) corresponding to CFsurvival's lower 0.01 event-time
   quantile and upper survival threshold 1 - 0.99 = 0.01. The SurvNPSA-specific
   no-effect uniform test keeps its own event-time quantile window.
+- SurvNPSA also allows uniform.window = c(t0, t1) as an exact-window option.
+  When supplied, this exact window is used instead of the CF-style cutpoint
+  rule for the SurvNPSA uniform outputs. For treatment-specific survival
+  curves, this exact window is also applied to equal-width uniform bands; the
+  default cutpoint behavior remains CFsurvival-style.
+- For npsa_surv(), rv.options can supply a URV-only uniform.window or
+  uniform.cutpoint. This changes the URV window only; bounds keep the
+  bound.options window.
 - SurvNPSA creates stable uniform-band columns filled with NA when
   conf.band = FALSE, so user-facing output has the same column names whether or
   not bands are requested.

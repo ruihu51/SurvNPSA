@@ -42,12 +42,13 @@ from the observed follow-up times.}
 May include \code{psi.type} and \code{tau.type}.}
 
 \item{bound.options}{List of options for reporting pointwise and uniform bounds.
-The \code{transform} option is also used for pointwise MIRV calculation.}
+The \code{transform} option is also used for pointwise MIRV calculation.
+May include \code{uniform.cutpoint} or an exact \code{uniform.window}.}
 
 \item{rv.options}{List of options for robustness value computation. May include
-\code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
-The \code{uniform.cutpoint} option follows the CFsurvival-style window:
-lower event-time quantile and upper survival cutoff.
+\code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
+and \code{uniform.cutpoint} options can be used here for a URV-specific
+window; otherwise URV uses the same window as \code{bound.options}.
 If \code{rv.times = NULL}, RV/MIRV are computed at about five
 representative fitted times.}
 

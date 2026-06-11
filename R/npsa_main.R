@@ -25,10 +25,11 @@
 #'   May include \code{psi.type} and \code{tau.type}.
 #' @param bound.options List of options for reporting pointwise and uniform bounds.
 #'   The \code{transform} option is also used for pointwise MIRV calculation.
+#'   May include \code{uniform.cutpoint} or an exact \code{uniform.window}.
 #' @param rv.options List of options for robustness value computation. May include
-#'   \code{rv.times}, \code{uniform.cutpoint}, \code{rho}, and \code{theta}.
-#'   The \code{uniform.cutpoint} option follows the CFsurvival-style window:
-#'   lower event-time quantile and upper survival cutoff.
+#'   \code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
+#'   and \code{uniform.cutpoint} options can be used here for a URV-specific
+#'   window; otherwise URV uses the same window as \code{bound.options}.
 #'   If \code{rv.times = NULL}, RV/MIRV are computed at about five
 #'   representative fitted times.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
@@ -91,8 +92,11 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     plot.times <- bound.options$plot.times
     transform <- bound.options$transform
     scale <- bound.options$scale
+    uniform.cutpoint <- bound.options$uniform.cutpoint
+    uniform.window <- bound.options$uniform.window
     rv.times <- rv.options$rv.times
-    uniform.cutpoint <- rv.options$uniform.cutpoint
+    rv.uniform.cutpoint <- rv.options$uniform.cutpoint
+    rv.uniform.window <- rv.options$uniform.window
     rho <- rv.options$rho
     theta <- rv.options$theta
     fit.times.rmst <- rmst.options$fit.times.rmst
@@ -187,9 +191,40 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         rv.times <- .get.report.times(rv.times, result$fit.times, default.all = FALSE,
                                       label = "rv.times")
     }
+    if (is.null(uniform.window)) {
+        surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
+        surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
+        uniform.window <- .np_contrast_band_endpts(time[event == 1],
+                                                   surv.0$surv.iso, surv.1$surv.iso,
+                                                   result$fit.times, uniform.cutpoint)
+        uniform.window.source <- "uniform.cutpoint"
+    } else {
+        uniform.window <- .np_trim_uniform_window(uniform.window, result$fit.times)
+        uniform.window.source <- "uniform.window"
+    }
+    if (!any(result$fit.times >= uniform.window[1] & result$fit.times <= uniform.window[2])) {
+        stop("No `fit.times` fall inside `uniform.window`.")
+    }
     time.info$plot.times <- plot.times
     time.info$rv.times <- rv.times
-    bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform, scale = scale)
+    time.info$uniform.window <- uniform.window
+    time.info$uniform.window.source <- uniform.window.source
+    time.info$uniform.cutpoint <- uniform.cutpoint
+    urv.window <- uniform.window
+    urv.window.source <- uniform.window.source
+    if (!is.null(rv.uniform.window)) {
+        urv.window <- .np_trim_uniform_window(rv.uniform.window, result$fit.times)
+        urv.window.source <- "rv.options$uniform.window"
+    } else if (!is.null(rv.uniform.cutpoint)) {
+        surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
+        surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
+        urv.window <- .np_contrast_band_endpts(time[event == 1],
+                                               surv.0$surv.iso, surv.1$surv.iso,
+                                               result$fit.times, rv.uniform.cutpoint)
+        urv.window.source <- "rv.options$uniform.cutpoint"
+    }
+    bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform,
+                                scale = scale, band.end.pts = uniform.window)
 
     # Simulate sensitivity parameters if needed
     if (is.null(senspar.df)) {
@@ -226,7 +261,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                 n_var = n_var,
                                 rmst = rmst,
                                 sens.rmst.df.mean = senspar.df$sens.rmst.df.mean,
-                                transform = transform, scale = scale)
+                                transform = transform, scale = scale,
+                                band.end.pts = uniform.window)
 
     bounds.df$bounds.df <- rbind(bounds.df$bounds.df, bounds.df.sens$bounds.df)
     if (rmst) bounds.df$bounds.df.rmst <- rbind(bounds.df$bounds.df.rmst, bounds.df.sens$bounds.df.rmst)
@@ -244,18 +280,15 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     # Robustness Values computations
     if (length(rv.times) > 0) {
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
-        surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
-        band.end.pts <- .np_contrast_band_endpts(time[event == 1],
-                                                 surv.0$surv.iso, surv.1$surv.iso,
-                                                 result$fit.times, uniform.cutpoint)
-        t.lower <- band.end.pts[1]
-        t.upper <- band.end.pts[2]
+        t.lower <- urv.window[1]
+        t.upper <- urv.window[2]
 
         out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
                                  transform = transform,
                                  verbose = verbose,
                                  unif = TRUE, t.lower = t.lower, t.upper = t.upper)
+        out$res.RV$uniform.window <- urv.window
+        out$res.RV$uniform.window.source <- urv.window.source
     }
 
     class(out) <- "npsa_surv"
@@ -317,6 +350,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     conf.level <- np.options$conf.level
     contrasts <- np.options$contrasts
     uniform.cutpoint <- np.options$uniform.cutpoint
+    uniform.window <- np.options$uniform.window
     isotonize <- np.options$isotonize
     seed <- np.options$seed
 
@@ -375,12 +409,17 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                  conf.level = conf.level,
                                  contrasts = contrasts,
                                  uniform.cutpoint = uniform.cutpoint,
+                                 uniform.window = uniform.window,
                                  isotonize = isotonize)
 
     # Uniform test for no observed survival difference
     uniform.test <- .np_uniform_test(result, time, event,
                                     uniform.cutpoint = uniform.cutpoint,
+                                    uniform.window = uniform.window,
                                     conf.level = conf.level)
+    time.info$uniform.window <- cf.out$band.end.pts
+    time.info$uniform.window.source <- if (is.null(uniform.window)) "uniform.cutpoint" else "uniform.window"
+    time.info$uniform.cutpoint <- uniform.cutpoint
 
     ci.summary <- .np_ci_summary(cf.out$surv.diff.df, plot.times)
 
@@ -410,6 +449,8 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #'   first gives the lower event-time quantile and the second gives the upper
 #'   survival threshold through \code{1 - p}, following the CFsurvival uniform
 #'   band window.
+#' @param uniform.window Optional exact two-time window for uniform procedures.
+#'   If supplied, it is used instead of \code{uniform.cutpoint}.
 #' @param isotonize Logical; if TRUE, apply CFsurvival-style isotonization to
 #'   treatment-specific survival curve display and treatment-specific survival
 #'   uniform bands. Pointwise confidence intervals and survival contrasts remain
@@ -422,8 +463,8 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #' @export
 np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.95,
                             contrasts = c("surv.diff", "surv.ratio", "risk.ratio", "nnt"),
-                            uniform.cutpoint = c(0.01, 0.99), isotonize = TRUE,
-                            seed = NULL) {
+                            uniform.cutpoint = c(0.01, 0.99), uniform.window = NULL,
+                            isotonize = TRUE, seed = NULL) {
     if (!is.null(plot.times) &&
         (!is.numeric(plot.times) || any(!is.finite(plot.times)) || any(plot.times < 0))) {
         stop("`plot.times` must be NULL or a non-negative numeric vector.")
@@ -440,6 +481,11 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
         any(uniform.cutpoint <= 0 | uniform.cutpoint >= 1) ||
         uniform.cutpoint[1] >= uniform.cutpoint[2]) {
         stop("`uniform.cutpoint` must contain two increasing numbers between 0 and 1.")
+    }
+    if (!is.null(uniform.window) &&
+        (length(uniform.window) != 2 || !is.numeric(uniform.window) ||
+         any(!is.finite(uniform.window)) || uniform.window[1] >= uniform.window[2])) {
+        stop("`uniform.window` must be NULL or two increasing finite numbers.")
     }
     if (length(isotonize) != 1 || !is.logical(isotonize) || is.na(isotonize)) {
         stop("`isotonize` must be TRUE or FALSE.")
@@ -469,6 +515,7 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
          conf.level = conf.level,
          contrasts = contrasts,
          uniform.cutpoint = uniform.cutpoint,
+         uniform.window = uniform.window,
          isotonize = isotonize,
          seed = seed)
 }
@@ -477,13 +524,41 @@ npsa_target.options <- function(psi.type = "hybrid", tau.type = "hybrid") {
     list(psi.type = psi.type, tau.type = tau.type)
 }
 
-npsa_bound.options <- function(plot.times = NULL, transform = TRUE, scale = TRUE) {
-    list(plot.times = plot.times, transform = transform, scale = scale)
+npsa_bound.options <- function(plot.times = NULL, transform = TRUE, scale = TRUE,
+                               uniform.cutpoint = c(0.01, 0.99),
+                               uniform.window = NULL) {
+    if (length(uniform.cutpoint) != 2 || !is.numeric(uniform.cutpoint) ||
+        any(!is.finite(uniform.cutpoint)) ||
+        any(uniform.cutpoint <= 0 | uniform.cutpoint >= 1) ||
+        uniform.cutpoint[1] >= uniform.cutpoint[2]) {
+        stop("`uniform.cutpoint` must contain two increasing numbers between 0 and 1.")
+    }
+    if (!is.null(uniform.window) &&
+        (length(uniform.window) != 2 || !is.numeric(uniform.window) ||
+         any(!is.finite(uniform.window)) || uniform.window[1] >= uniform.window[2])) {
+        stop("`uniform.window` must be NULL or two increasing finite numbers.")
+    }
+    list(plot.times = plot.times, transform = transform, scale = scale,
+         uniform.cutpoint = uniform.cutpoint, uniform.window = uniform.window)
 }
 
-npsa_rv.options <- function(rv.times = NULL, uniform.cutpoint = c(0.01, 0.99),
+npsa_rv.options <- function(rv.times = NULL, uniform.cutpoint = NULL,
+                            uniform.window = NULL,
                             rho = 1, theta = 0) {
+    if (!is.null(uniform.cutpoint) &&
+        (length(uniform.cutpoint) != 2 || !is.numeric(uniform.cutpoint) ||
+         any(!is.finite(uniform.cutpoint)) ||
+         any(uniform.cutpoint <= 0 | uniform.cutpoint >= 1) ||
+         uniform.cutpoint[1] >= uniform.cutpoint[2])) {
+        stop("`uniform.cutpoint` must contain two increasing numbers between 0 and 1.")
+    }
+    if (!is.null(uniform.window) &&
+        (length(uniform.window) != 2 || !is.numeric(uniform.window) ||
+         any(!is.finite(uniform.window)) || uniform.window[1] >= uniform.window[2])) {
+        stop("`uniform.window` must be NULL or two increasing finite numbers.")
+    }
     list(rv.times = rv.times, uniform.cutpoint = uniform.cutpoint,
+         uniform.window = uniform.window,
          rho = rho, theta = theta)
 }
 

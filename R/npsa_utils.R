@@ -498,6 +498,8 @@ plot.npsa_times <- function(x, ...) {
 
   uniform.bounds.lower <- effect.lower - q_n / sqrt(n)
   uniform.bounds.upper <- effect.upper + q_n / sqrt(n)
+  uniform.bounds.lower[fit.times < band.end.pts[1] | fit.times > band.end.pts[2]] <- NA
+  uniform.bounds.upper[fit.times < band.end.pts[1] | fit.times > band.end.pts[2]] <- NA
 
   # uniform transformation - correlated
   IF.trans.l <- IF.vals.effect.lower

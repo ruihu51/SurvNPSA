@@ -10,6 +10,7 @@ np_surv.options(
   conf.level = 0.95,
   contrasts = c("surv.diff", "surv.ratio", "risk.ratio", "nnt"),
   uniform.cutpoint = c(0.01, 0.99),
+  uniform.window = NULL,
   isotonize = TRUE,
   seed = NULL
 )
@@ -29,6 +30,9 @@ If \code{NULL}, all fitted times are used.}
 first gives the lower event-time quantile and the second gives the upper
 survival threshold through \code{1 - p}, following the CFsurvival uniform
 band window.}
+
+\item{uniform.window}{Optional exact two-time window for uniform procedures.
+If supplied, it is used instead of \code{uniform.cutpoint}.}
 
 \item{isotonize}{Logical; if TRUE, apply CFsurvival-style isotonization to
 treatment-specific survival curve display and treatment-specific survival

@@ -11,7 +11,8 @@
 }
 
 .np_surv.confints <- function(times, est, IF.vals, isotonize=TRUE, conf.band=TRUE,
-                              band.end.pts=c(0,Inf), conf.level=.95) {
+                              band.end.pts=c(0,Inf), conf.level=.95,
+                              band.ew=FALSE) {
     logit <- function(x) log(x / (1-x))
     logit.prime <- function(x) 1/(x * (1-x))
     expit <- function(x) 1/(1 + exp(-x))
@@ -35,14 +36,20 @@
 
     out <- NULL
     if(conf.band) {
-        if(any(!is.na(res$se))) {
-            unif.vals <- .np_estimate.uniform.quantile(IF.vals[,!is.na(res$se), drop=FALSE],
+        ew.idx <- !is.na(res$se)
+        if (band.ew) ew.idx <- ew.idx & times >= band.end.pts[1] & times <= band.end.pts[2]
+        if(any(ew.idx)) {
+            unif.vals <- .np_estimate.uniform.quantile(IF.vals[,ew.idx, drop=FALSE],
                                                        conf.level, scale = FALSE)
             unif.quant <- unif.vals$quantile
             out$ew.sim.maxes <- unif.vals$maxes
             out$unif.ew.quant <- unif.quant
             res$unif.ew.lower <- pmax(est - unif.quant / sqrt(n), 0)
             res$unif.ew.upper <- pmin(est + unif.quant / sqrt(n), 1)
+            if (band.ew) {
+                res$unif.ew.lower[times < band.end.pts[1] | times > band.end.pts[2]] <- NA
+                res$unif.ew.upper[times < band.end.pts[1] | times > band.end.pts[2]] <- NA
+            }
 
             if(isotonize) {
                 res$unif.ew.lower[!is.na(res$unif.ew.lower)] <-
@@ -298,29 +305,39 @@
 
 .np_report_cf_surv <- function(time, event, treat, result, conf.band=TRUE,
                                conf.level=.95, contrasts=c("surv.diff", "surv.ratio"),
-                               uniform.cutpoint=c(0.01, 0.99), isotonize=TRUE) {
+                               uniform.cutpoint=c(0.01, 0.99), uniform.window=NULL,
+                               isotonize=TRUE) {
     fit.times <- result$fit.times
     surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = isotonize)
     surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = isotonize)
+    exact.window <- !is.null(uniform.window)
 
-    band.end.pts.0 <- .np_surv_band_endpts(time[event == 1 & treat == 0],
-                                           surv.0$surv.iso, fit.times,
-                                           uniform.cutpoint)
-    band.end.pts.1 <- .np_surv_band_endpts(time[event == 1 & treat == 1],
-                                           surv.1$surv.iso, fit.times,
-                                           uniform.cutpoint)
-    band.end.pts <- .np_contrast_band_endpts(time[event == 1],
-                                             surv.0$surv.iso, surv.1$surv.iso,
-                                             fit.times, uniform.cutpoint)
+    if (is.null(uniform.window)) {
+        band.end.pts.0 <- .np_surv_band_endpts(time[event == 1 & treat == 0],
+                                               surv.0$surv.iso, fit.times,
+                                               uniform.cutpoint)
+        band.end.pts.1 <- .np_surv_band_endpts(time[event == 1 & treat == 1],
+                                               surv.1$surv.iso, fit.times,
+                                               uniform.cutpoint)
+        band.end.pts <- .np_contrast_band_endpts(time[event == 1],
+                                                 surv.0$surv.iso, surv.1$surv.iso,
+                                                 fit.times, uniform.cutpoint)
+    } else {
+        band.end.pts <- .np_trim_uniform_window(uniform.window, fit.times)
+        band.end.pts.0 <- band.end.pts
+        band.end.pts.1 <- band.end.pts
+    }
 
     surv.df.0 <- .np_surv_df_one(fit.times, surv.0, trt = 0, conf.band = conf.band,
                                  band.end.pts = band.end.pts.0,
                                  conf.level = conf.level,
-                                 isotonize = isotonize)
+                                 isotonize = isotonize,
+                                 band.ew = exact.window)
     surv.df.1 <- .np_surv_df_one(fit.times, surv.1, trt = 1, conf.band = conf.band,
                                  band.end.pts = band.end.pts.1,
                                  conf.level = conf.level,
-                                 isotonize = isotonize)
+                                 isotonize = isotonize,
+                                 band.ew = exact.window)
 
     out <- list(surv.df = rbind(surv.df.0$surv.df, surv.df.1$surv.df),
                 surv.0.unif.ew.quant = surv.df.0$unif.ew.quant,
@@ -398,12 +415,14 @@
 }
 
 .np_surv_df_one <- function(fit.times, surv, trt, conf.band=TRUE,
-                            band.end.pts=c(0, Inf), conf.level=.95, isotonize=TRUE) {
+                            band.end.pts=c(0, Inf), conf.level=.95,
+                            isotonize=TRUE, band.ew=FALSE) {
     c.int <- .np_surv.confints(fit.times, surv$surv, surv$IF.vals,
                                conf.band = conf.band,
                                band.end.pts = band.end.pts,
                                conf.level = conf.level,
-                               isotonize = isotonize)
+                               isotonize = isotonize,
+                               band.ew = band.ew)
     surv.df <- data.frame(time = c(0, fit.times),
                           trt = trt,
                           surv = c(1, surv$surv.iso))
@@ -459,13 +478,26 @@
     return(out)
 }
 
+.np_trim_uniform_window <- function(uniform.window, fit.times) {
+    out <- c(max(uniform.window[1], min(fit.times)),
+             min(uniform.window[2], max(fit.times)))
+    if (!any(fit.times >= out[1] & fit.times <= out[2])) {
+        stop("No `fit.times` fall inside `uniform.window`.")
+    }
+    return(out)
+}
+
 .np_uniform_test <- function(result, time, event, uniform.cutpoint=c(0.01, 0.99),
-                             conf.level=.95, theta=0) {
+                             uniform.window=NULL, conf.level=.95, theta=0) {
     surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
     surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
-    band.end.pts <- .np_contrast_band_endpts(time[event == 1],
-                                             surv.0$surv.iso, surv.1$surv.iso,
-                                             result$fit.times, uniform.cutpoint)
+    if (is.null(uniform.window)) {
+        band.end.pts <- .np_contrast_band_endpts(time[event == 1],
+                                                 surv.0$surv.iso, surv.1$surv.iso,
+                                                 result$fit.times, uniform.cutpoint)
+    } else {
+        band.end.pts <- .np_trim_uniform_window(uniform.window, result$fit.times)
+    }
     unif.idx <- which(result$fit.times >= band.end.pts[1] & result$fit.times <= band.end.pts[2])
     if (length(unif.idx) == 0) {
         return(data.frame(t.lower = band.end.pts[1], t.upper = band.end.pts[2],

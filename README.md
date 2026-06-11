@@ -43,7 +43,8 @@ The main time options are:
 - `nuisance.options$eval.times`: the internal prediction grid for nuisance survival models; most users should not set this.
 - `bound.options$plot.times`: times reported for sensitivity bounds; defaults to all fitted times.
 - `rv.options$rv.times`: times where RV/MIRV are computed; defaults to `plot.times` when users set `plot.times`, otherwise about five representative fitted times.
-- `uniform.cutpoint`: defines the uniform inference window; it is not a set of pointwise output times.
+- `bound.options$uniform.cutpoint` or `bound.options$uniform.window`: defines the uniform inference window; it is not a set of pointwise output times.
+- `rv.options$uniform.window` or `rv.options$uniform.cutpoint`: optional URV-only window override.
 - `rmst.options$fit.times.rmst`: RMST horizons; choose these only when running `npsa_surv(rmst = TRUE)`.
 
 Common time-setting scenarios:
