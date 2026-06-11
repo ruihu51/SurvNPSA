@@ -780,6 +780,8 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 
   if (conf.bounds){
     n <- dim(IF.vals.theta.obs)[1]
+    library(mvtnorm)
+    epsilon.base <- rmvnorm(n=boot, mean=rep(0, 2), sigma = diag(2))
 
     # pointwise confidence intervals as function of sensitivity parameters
     bounds.senspar <- function(x, lower.b=TRUE){
@@ -813,7 +815,11 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
       }
 
 
-      epsilon <- rmvnorm(n=boot, mean=rep(0, 2), sigma = cov.matrix)
+      cov.eigen <- eigen(cov.matrix, symmetric = TRUE)
+      cov.sqrt <- cov.eigen$vectors %*%
+          diag(sqrt(pmax(cov.eigen$values, 0)), nrow = 2) %*%
+          t(cov.eigen$vectors)
+      epsilon <- epsilon.base %*% cov.sqrt
       epsilon[,2] <- - epsilon[,2]
       c_alpha <- unname(quantile(apply(epsilon, 1, max), conf.level))
 
