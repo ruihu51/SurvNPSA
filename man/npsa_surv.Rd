@@ -58,7 +58,8 @@ representative fitted times.}
 
 \item{sens.options}{List of options for sensitivity parameter simulation.
 Use \code{senspar.save.path} to save generated sensitivity parameters to
-a custom path.}
+a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
+parameter simulation.}
 
 \item{result}{Optional precomputed result object (e.g., containing nuisances).}
 

@@ -5,9 +5,14 @@
                               fit.times,
                               psi, tau, S.hat.obs, g.hat.obs,
                               num_drop = NULL, pct_drop = NULL, rep = 100, seed = 6741,
-                              rmst = TRUE, fit.times.rmst = NULL, gamma = NULL, max_gap = NULL, tol=NULL){
+                              rmst = TRUE, fit.times.rmst = NULL, gamma = NULL, max_gap = NULL, tol=NULL,
+                              var_names = NULL, verbose = TRUE){
 
   n_var <- ncol(confounders)
+  if (is.null(var_names)) {
+    var_names <- colnames(confounders)
+    if (is.null(var_names)) var_names <- paste0("W", seq_len(n_var))
+  }
 
   if (is.null(num_drop) && is.null(pct_drop)) {
     stop("You must specify either 'num_drop' or 'pct_drop'.")
@@ -35,6 +40,8 @@
   Gain.out.df <- data.frame(value = numeric(), t = numeric(), j = integer(), d = integer())
   Gain.out.phi.df <- data.frame(value = numeric(), t = numeric(), j = integer(), d = integer())
   Gain.trt.df <- data.frame(value = numeric(), j = integer(), d = integer())
+  drop.sets <- data.frame(j = integer(), d = integer(),
+                          drop.index = character(), drop.name = character())
 
   num_drop <- sort(unique(c(num_drop, 1, ceiling(0.5 * n_var))))
   num_drop <- num_drop[num_drop >= 1 & num_drop < n_var]
@@ -52,14 +59,21 @@
 
 
     for (j in 1:J){
-      cat("d =", d, " j =", j, " Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+      if (verbose) cat("d =", d, " j =", j, " Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
       if (is.matrix(drop.index)){
-        confounders.drop <- confounders[,-(drop.index[,j])]
+        drop.idx <- drop.index[,j]
+        confounders.drop <- confounders[,-drop.idx]
       } else {
-        confounders.drop <- confounders[,-(drop.index[j])]
+        drop.idx <- drop.index[j]
+        confounders.drop <- confounders[,-drop.idx]
       }
 
-      cat(names(confounders)[!(names(confounders) %in% names(confounders.drop))], "\n")
+      drop.idx.txt <- paste(drop.idx, collapse = ",")
+      drop.name.txt <- paste(var_names[drop.idx], collapse = ",")
+      drop.sets <- rbind(drop.sets, data.frame(j = j, d = d,
+                                               drop.index = drop.idx.txt,
+                                               drop.name = drop.name.txt))
+      if (verbose) cat(drop.name.txt, "\n")
 
       result.sim.drop <- .get.nuisances.est(time = time,
                                             event = event,
@@ -101,18 +115,20 @@
       V.g.matrix.psi <- colMeans((S.hat.obs - S.hat.obs.drop)^2)
 
       V.a.vector <- tau - result.sim.drop$tau
-      cat(V.a.vector, "\n")
+      if (verbose) cat(V.a.vector, "\n")
       V.a.vector <- mean((alpha.obs - alpha.drop)^2)
-      cat(V.a.vector, "\n")
+      if (verbose) cat(V.a.vector, "\n")
 
       Gain.out.matrix = pmax(0, V.g.matrix.psi[eval.idx] / psi[fit.idx]) # 1*t
       Gain.trt.vector = pmax(0, V.a.vector / result.sim.drop$tau) # 1*1
 
-      cat(length(result.sim.drop$fit.times), "\n")
+      if (verbose) cat(length(result.sim.drop$fit.times), "\n")
       Gain.out.df <- rbind(Gain.out.df, data.frame(C.Y.sq = Gain.out.matrix,
                                                    t = result.sim.drop$fit.times,
                                                    j = j,
-                                                   d = d))
+                                                   d = d,
+                                                   drop.index = drop.idx.txt,
+                                                   drop.name = drop.name.txt))
 
       Gain.trt.df <- rbind(Gain.trt.df, data.frame(C.A.sq = Gain.trt.vector / (1 - Gain.trt.vector),
                                                    j = j,
@@ -134,7 +150,9 @@
         Gain.out.phi.df <- rbind(Gain.out.phi.df, data.frame(C.Y.sq = Gain.out.phi.matrix,
                                                              t = fit.times.rmst,
                                                              j = j,
-                                                             d = d))
+                                                             d = d,
+                                                             drop.index = drop.idx.txt,
+                                                             drop.name = drop.name.txt))
       }
 
     }
@@ -147,8 +165,16 @@
     group_by(d, t) %>%
     summarize(sens.par = mean(sens.par), .groups = "drop")
 
+  meta <- list(seed = seed,
+               rep = rep,
+               pct_drop = pct_drop,
+               num_drop = num_drop,
+               var_names = var_names)
+
   senspar <- list(sens.df = sens.df,
-                  sens.df.mean = sens.df.mean)
+                  sens.df.mean = sens.df.mean,
+                  drop.sets = drop.sets,
+                  meta = meta)
 
   if (rmst){
     sens.rmst.df <- merge(Gain.out.phi.df, Gain.trt.df, by = c("j", "d"))
@@ -161,7 +187,9 @@
     senspar <- list(sens.df = sens.df,
                     sens.df.mean = sens.df.mean,
                     sens.rmst.df = sens.rmst.df,
-                    sens.rmst.df.mean = sens.rmst.df.mean)
+                    sens.rmst.df.mean = sens.rmst.df.mean,
+                    drop.sets = drop.sets,
+                    meta = meta)
   }
 
   return(senspar)
@@ -176,4 +204,3 @@
   hcubature(theta.obs.func, lowerLimit = c(0),
             upperLimit = c(t), tol=tol)$integral
 }
-

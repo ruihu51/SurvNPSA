@@ -22,7 +22,9 @@
   fit.times.rmst = NULL,
   gamma = NULL,
   max_gap = NULL,
-  tol = NULL
+  tol = NULL,
+  var_names = NULL,
+  verbose = TRUE
 )
 }
 \description{

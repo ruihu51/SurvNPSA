@@ -36,7 +36,8 @@
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
 #'   Use \code{senspar.save.path} to save generated sensitivity parameters to
-#'   a custom path.
+#'   a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
+#'   parameter simulation.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.
@@ -110,6 +111,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     senspar.df <- sens.options$senspar.df
     num_drop <- sens.options$num_drop
     senspar.save.path <- sens.options$senspar.save.path
+    sens.seed <- sens.options$seed
+    senspar.only <- sens.options$senspar.only
 
     n_var <- ncol(confounders)
     if (is.null(var_names)) {
@@ -168,8 +171,53 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         }
     }
 
-    # Observed bounds
-    if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+    # Simulate sensitivity parameters if needed
+    senspar.saved <- FALSE
+    if (is.null(senspar.df)) {
+        if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        senspar.df <- .simulate.senspar(time, event, treat, confounders,
+                                        fit.times = result$fit.times,
+                                        psi = result$obs.comps.df$psi,
+                                        tau = result$tau,
+                                        S.hat.obs = result$nuisance$event.pred,
+                                        g.hat.obs = result$nuisance$prop.pred,
+                                        pct_drop = pct_drop,
+                                        rep = rep,
+                                        seed = sens.seed,
+                                        rmst = rmst,
+                                        fit.times.rmst = if (rmst) result$fit.times.rmst else NULL,
+                                        gamma = if (rmst) result$gamma.est else NULL,
+                                        max_gap = if (rmst) max_gap else NULL,
+                                        tol = if (rmst) tol else NULL,
+                                        var_names = var_names,
+                                        verbose = verbose)
+        if (save || !is.null(senspar.save.path)) {
+            if (is.null(senspar.save.path)) senspar.save.path <- "dev/senspar.df.RData"
+            dir.create(dirname(senspar.save.path), recursive = TRUE, showWarnings = FALSE)
+            save(senspar.df, file = senspar.save.path)
+            senspar.saved <- TRUE
+        }
+    } else {
+        if (verbose) cat("Using user-provided sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        senspar.df <- senspar.df
+    }
+
+    if (senspar.only) {
+        if ((save || !is.null(senspar.save.path)) && !senspar.saved) {
+            if (is.null(senspar.save.path)) senspar.save.path <- "dev/senspar.df.RData"
+            dir.create(dirname(senspar.save.path), recursive = TRUE, showWarnings = FALSE)
+            save(senspar.df, file = senspar.save.path)
+        }
+        out <- list(result = result,
+                    senspar.df = senspar.df,
+                    var_names = var_names,
+                    time.info = time.info)
+        class(out) <- "npsa_surv"
+        if (verbose) cat("Finished after sensitivity parameter simulation:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        return(out)
+    }
+
+    # Report times and uniform window
     if (is.null(plot.times)) {
         plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
                                         label = "plot.times")
@@ -223,34 +271,11 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                                result$fit.times, rv.uniform.cutpoint)
         urv.window.source <- "rv.options$uniform.cutpoint"
     }
+
+    # Observed bounds
+    if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform,
                                 scale = scale, band.end.pts = uniform.window)
-
-    # Simulate sensitivity parameters if needed
-    if (is.null(senspar.df)) {
-        if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        senspar.df <- .simulate.senspar(time, event, treat, confounders,
-                                        fit.times = result$fit.times,
-                                        psi = result$obs.comps.df$psi,
-                                        tau = result$tau,
-                                        S.hat.obs = result$nuisance$event.pred,
-                                        g.hat.obs = result$nuisance$prop.pred,
-                                        pct_drop = pct_drop,
-                                        rep = rep,
-                                        rmst = rmst,
-                                        fit.times.rmst = if (rmst) result$fit.times.rmst else NULL,
-                                        gamma = if (rmst) result$gamma.est else NULL,
-                                        max_gap = if (rmst) max_gap else NULL,
-                                        tol = if (rmst) tol else NULL)
-        if (save || !is.null(senspar.save.path)) {
-            if (is.null(senspar.save.path)) senspar.save.path <- "dev/senspar.df.RData"
-            dir.create(dirname(senspar.save.path), recursive = TRUE, showWarnings = FALSE)
-            save(senspar.df, file = senspar.save.path)
-        }
-    } else {
-        if (verbose) cat("Using user-provided sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-        senspar.df <- senspar.df
-    }
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -581,13 +606,22 @@ npsa_rmst.options <- function(fit.times.rmst = NULL, gamma.type = "hybrid",
 
 npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
                               senspar.df = NULL, num_drop = NULL,
-                              senspar.save.path = NULL) {
+                              senspar.save.path = NULL,
+                              seed = 6741,
+                              senspar.only = FALSE) {
     if (!is.null(senspar.save.path) &&
         (!is.character(senspar.save.path) || length(senspar.save.path) != 1 ||
          is.na(senspar.save.path) || !nzchar(senspar.save.path))) {
         stop("'senspar.save.path' must be a non-empty character string or NULL.")
     }
+    if (length(seed) != 1 || !is.numeric(seed) || is.na(seed)) {
+        stop("'seed' must be one number.")
+    }
+    if (length(senspar.only) != 1 || !is.logical(senspar.only) || is.na(senspar.only)) {
+        stop("'senspar.only' must be TRUE or FALSE.")
+    }
 
     list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df,
-         num_drop = num_drop, senspar.save.path = senspar.save.path)
+         num_drop = num_drop, senspar.save.path = senspar.save.path,
+         seed = seed, senspar.only = senspar.only)
 }
