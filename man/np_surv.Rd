@@ -12,6 +12,8 @@ np_surv(
   fit.times = NULL,
   nuisance.options = list(),
   np.options = list(),
+  rmst = FALSE,
+  rmst.options = list(),
   result = NULL,
   var_names = NULL,
   verbose = FALSE,
@@ -35,6 +37,14 @@ follow-up times.}
 
 \item{np.options}{List of options from \code{\link{np_surv.options}()}.}
 
+\item{rmst}{Logical; if TRUE, estimate RMST difference under no unobserved
+confounding.}
+
+\item{rmst.options}{List of options for RMST estimation. If \code{rmst = TRUE}
+and \code{fit.times.rmst} is not supplied, the default RMST horizon is
+\code{max(fit.times)} with a message reminding users that RMST horizons
+need analyst interpretation.}
+
 \item{result}{Optional precomputed result object containing nuisances or observed components.}
 
 \item{var_names}{Character vector of confounder variable names.}
@@ -46,6 +56,8 @@ follow-up times.}
 \value{
 A list of class \code{npSurv}, including \code{time.info} with the
 selected analysis and nuisance time grids.
+When \code{rmst = TRUE}, the returned object also includes
+\code{rmst.diff.df}.
 }
 \description{
 Estimate the adjusted survival results under no unobserved confounding.

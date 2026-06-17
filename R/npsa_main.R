@@ -33,7 +33,10 @@
 #'   If \code{rv.times = NULL}, RV/MIRV are computed at about five
 #'   representative fitted times.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
-#' @param rmst.options List of options for RMST estimation.
+#' @param rmst.options List of options for RMST estimation. If \code{rmst = TRUE}
+#'   and \code{fit.times.rmst} is not supplied, the default RMST horizon is
+#'   \code{max(fit.times)} with a message reminding users that RMST horizons
+#'   need analyst interpretation.
 #' @param sens.options List of options for sensitivity parameter simulation.
 #'   Use either \code{pct_drop} for percentage-based dropping or \code{num_drop}
 #'   for exact numbers of covariates to drop, but not both. The default uses
@@ -163,7 +166,17 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # RMST Estimation if requested
     if (rmst) {
-        if (is.null(fit.times.rmst)) stop("Must specify 'fit.times.rmst' when rmst = TRUE.")
+        fit.times.rmst.source <- "user"
+        if (is.null(fit.times.rmst) && !is.null(result$fit.times.rmst)) {
+            fit.times.rmst <- result$fit.times.rmst
+            fit.times.rmst.source <- "result"
+        } else if (is.null(fit.times.rmst)) {
+            fit.times.rmst <- max(result$fit.times)
+            fit.times.rmst.source <- "default"
+            message("`rmst.options$fit.times.rmst` was not supplied. Using max(fit.times) = ",
+                    signif(fit.times.rmst, 4),
+                    " as the RMST horizon. Please check whether this RMST horizon is meaningful for your analysis, because RMST requires analyst interpretation.")
+        }
         if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         if (is.null(result$rmst.obs)) {
             eval.times.rmst <- result$fit.times
@@ -173,6 +186,9 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                           gamma.type, verbose = verbose)
             if (save) save(result, file = "dev/result.RData")
         }
+        time.info$fit.times.rmst <- result$fit.times.rmst
+        time.info$fit.times.rmst.source <- fit.times.rmst.source
+        rmst.options$fit.times.rmst <- result$fit.times.rmst
     }
 
     # Simulate sensitivity parameters if needed
@@ -353,18 +369,27 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #'   follow-up times.
 #' @param nuisance.options List of options for nuisance estimation.
 #' @param np.options List of options from \code{\link{np_surv.options}()}.
+#' @param rmst Logical; if TRUE, estimate RMST difference under no unobserved
+#'   confounding.
+#' @param rmst.options List of options for RMST estimation. If \code{rmst = TRUE}
+#'   and \code{fit.times.rmst} is not supplied, the default RMST horizon is
+#'   \code{max(fit.times)} with a message reminding users that RMST horizons
+#'   need analyst interpretation.
 #' @param result Optional precomputed result object containing nuisances or observed components.
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print progress messages.
 #' @param save Logical; if TRUE, save intermediate result to \code{dev/result.RData}.
 #'
 #' @return A list of class \code{npSurv}, including \code{time.info} with the
-#'   selected analysis and nuisance time grids.
+#'   selected analysis and nuisance time grids. When \code{rmst = TRUE}, the
+#'   returned object also includes \code{rmst.diff.df}.
 #'
 #' @export
 np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                     nuisance.options = list(),
                     np.options = list(),
+                    rmst = FALSE,
+                    rmst.options = list(),
                     result = NULL,
                     var_names = NULL,
                     verbose = FALSE,
@@ -372,6 +397,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # Update control parameters
     np.options <- do.call(np_surv.options, np.options)
+    rmst.options <- do.call(npsa_rmst.options, rmst.options)
 
     # Extract options
     psi.type <- "hybrid"
@@ -384,6 +410,12 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     uniform.window <- np.options$uniform.window
     isotonize <- np.options$isotonize
     seed <- np.options$seed
+    fit.times.rmst <- rmst.options$fit.times.rmst
+    gamma.type <- rmst.options$gamma.type
+    max_gap <- rmst.options$max_gap
+    tol <- rmst.options$tol
+    tol1 <- rmst.options$tol1
+    tol2 <- rmst.options$tol2
 
     n_var <- ncol(confounders)
     if (is.null(var_names)) {
@@ -430,6 +462,32 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     time.info$n.fit.times <- length(result$fit.times)
     time.info$n.eval.times <- length(result$nuisance$eval.times)
 
+    # RMST Estimation if requested
+    if (rmst) {
+        fit.times.rmst.source <- "user"
+        if (is.null(fit.times.rmst) && !is.null(result$fit.times.rmst)) {
+            fit.times.rmst <- result$fit.times.rmst
+            fit.times.rmst.source <- "result"
+        } else if (is.null(fit.times.rmst)) {
+            fit.times.rmst <- max(result$fit.times)
+            fit.times.rmst.source <- "default"
+            message("`rmst.options$fit.times.rmst` was not supplied. Using max(fit.times) = ",
+                    signif(fit.times.rmst, 4),
+                    " as the RMST horizon. Please check whether this RMST horizon is meaningful for your analysis, because RMST requires analyst interpretation.")
+        }
+        if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        if (is.null(result$rmst.obs)) {
+            eval.times.rmst <- result$fit.times
+            result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
+                                          max_gap, tol, tol1, tol2,
+                                          gamma.type, verbose = verbose)
+            if (save) save(result, file = "dev/result.RData")
+        }
+        time.info$fit.times.rmst <- result$fit.times.rmst
+        time.info$fit.times.rmst.source <- fit.times.rmst.source
+        rmst.options$fit.times.rmst <- result$fit.times.rmst
+    }
+
     plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
                                     label = "plot.times")
     time.info$plot.times <- plot.times
@@ -452,6 +510,19 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                     band.end.pts = cf.out$band.end.pts,
                                     conf.level = conf.level)
     cf.out$surv.diff.df <- surv.diff.out$bounds.df
+    rmst.diff.df <- NULL
+    rmst.summary <- NULL
+    if (rmst) {
+        rmst.out <- .report.bounds(result$fit.times, result,
+                                   rmst = TRUE,
+                                   transform = TRUE,
+                                   scale = TRUE,
+                                   band.end.pts = cf.out$band.end.pts,
+                                   conf.level = conf.level)
+        rmst.diff.df <- rmst.out$bounds.df.rmst
+        rmst.summary <- .np_ci_summary(rmst.diff.df, result$fit.times.rmst)
+        names(rmst.summary)[names(rmst.summary) == "surv.diff"] <- "rmst.diff"
+    }
 
     # Uniform test for no observed survival difference
     uniform.test <- .np_uniform_test(result, time, event,
@@ -467,11 +538,14 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     out <- c(list(result = result,
                   uniform.test = uniform.test,
                   ci.summary = ci.summary,
+                  rmst.summary = rmst.summary,
                   plot.times = plot.times,
                   var_names = var_names,
                   time.info = time.info,
-                  options = list(np.options = np.options)),
+                  options = list(np.options = np.options,
+                                 rmst.options = rmst.options)),
              cf.out)
+    if (rmst) out$rmst.diff.df <- rmst.diff.df
 
     class(out) <- "npSurv"
     if (verbose) cat("Finished:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -605,6 +679,11 @@ npsa_rv.options <- function(rv.times = NULL, uniform.cutpoint = NULL,
 
 npsa_rmst.options <- function(fit.times.rmst = NULL, gamma.type = "hybrid",
                               max_gap = 0.2, tol = 0.01, tol1 = 0.01, tol2 = 0.01) {
+    if (!is.null(fit.times.rmst) &&
+        (!is.numeric(fit.times.rmst) || any(!is.finite(fit.times.rmst)) ||
+         any(fit.times.rmst <= 0))) {
+        stop("'fit.times.rmst' must be NULL or positive finite values.")
+    }
     list(fit.times.rmst = fit.times.rmst, gamma.type = gamma.type,
          max_gap = max_gap, tol = tol, tol1 = tol1, tol2 = tol2)
 }

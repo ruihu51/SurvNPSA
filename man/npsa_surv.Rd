@@ -54,7 +54,10 @@ representative fitted times.}
 
 \item{rmst}{Logical; if TRUE, estimate RMST and its bounds inference as well.}
 
-\item{rmst.options}{List of options for RMST estimation.}
+\item{rmst.options}{List of options for RMST estimation. If \code{rmst = TRUE}
+and \code{fit.times.rmst} is not supplied, the default RMST horizon is
+\code{max(fit.times)} with a message reminding users that RMST horizons
+need analyst interpretation.}
 
 \item{sens.options}{List of options for sensitivity parameter simulation.
 Use either \code{pct_drop} for percentage-based dropping or \code{num_drop}

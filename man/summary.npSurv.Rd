@@ -19,3 +19,7 @@ Invisibly returns \code{object}.
 \description{
 Summarize No-Unobserved-Confounding Survival Results
 }
+\details{
+If \code{np_surv(rmst = TRUE)} was used, the summary also prints the RMST
+difference table.
+}

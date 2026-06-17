@@ -13,17 +13,24 @@ library(cubature)
         fit.times.rmst <- fit.times.rmst[fit.times.rmst <= max(result$fit.times)]
     }
 
+    if (length(fit.times.rmst) == 0) {
+        stop("No fit.times.rmst remain within the fitted time range.")
+    }
+
     # cat("1", "\n")
-    gap <- max(diff(sort(eval.times.rmst[eval.times.rmst >= min(eval.times.rmst) & eval.times.rmst <= max(fit.times.rmst)])))
-    if (gap > max_gap) {
-        stop(sprintf(
-            paste0(
-                "Error: fit.times is too sparse (gap = %.2f).\n",
-                "Cannot guarantee RMST integration accuracy.\n",
-                "Please re-estimate nuisances using a denser fit.times grid with `.get.nuisances.est()`."
-            ),
-            gap
-        ))
+    eval.times.rmst.check <- sort(eval.times.rmst[eval.times.rmst >= min(eval.times.rmst) & eval.times.rmst <= max(fit.times.rmst)])
+    if (length(eval.times.rmst.check) > 1) {
+        gap <- max(diff(eval.times.rmst.check))
+        if (gap > max_gap) {
+            stop(sprintf(
+                paste0(
+                    "Error: fit.times is too sparse (gap = %.2f).\n",
+                    "Cannot guarantee RMST integration accuracy.\n",
+                    "Please re-estimate nuisances using a denser fit.times grid with `.get.nuisances.est()`."
+                ),
+                gap
+            ))
+        }
     }
 
     if(verbose) message("Estimating RMST differences...")
@@ -32,6 +39,9 @@ library(cubature)
     result$IF.vals.rmst.obs <- t(apply(result$IF.vals.theta.obs, 1, function(row) {
         sapply(fit.times.rmst, function(t) .get.obs.rmst.int.vals(t, row, tol = tol, eval.times.rmst=eval.times.rmst))
     }))
+    if (length(fit.times.rmst) == 1) {
+        result$IF.vals.rmst.obs <- matrix(as.numeric(result$IF.vals.rmst.obs), ncol = 1)
+    }
 
     if(verbose) message("Estimating E[(min(T,t)-S(t|A,W))^2]...")
     gamma.rst <- .estimate.gamma(Y=time,
@@ -49,6 +59,9 @@ library(cubature)
     IF.vals.gamma.p1.int <- t(apply(gamma.rst$IF.vals.gamma.p1, 1, function(row) {
         sapply(fit.times.rmst, function(t) .get.gamma.p1.int.vals(t, row, tol = tol1, eval.times.rmst=eval.times.rmst))
     }))
+    if (length(fit.times.rmst) == 1) {
+        IF.vals.gamma.p1.int <- matrix(as.numeric(IF.vals.gamma.p1.int), ncol = 1)
+    }
 
     if(verbose) message("Estimating E[(min(T,t)-S(t|A,W))^2] part 2...")
     eval.times.area <- expand.grid(eval.times.rmst, eval.times.rmst)
@@ -59,6 +72,9 @@ library(cubature)
     IF.vals.gamma.p2.int <- t(apply(gamma.rst$IF.vals.gamma.p2, 1, function(row) {
         sapply(fit.times.rmst, function(t) .get.gamma.p2.int.vals(t, row, tol = tol2, eval.times.area=eval.times.area))
     }))
+    if (length(fit.times.rmst) == 1) {
+        IF.vals.gamma.p2.int <- matrix(as.numeric(IF.vals.gamma.p2.int), ncol = 1)
+    }
 
     gamma.est <- gamma.p1 - gamma.p2
     gamma.est.plug.in <- gamma.p1.plug.in - gamma.p2.plug.in

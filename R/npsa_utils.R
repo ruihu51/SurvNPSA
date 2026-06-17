@@ -14,6 +14,10 @@
 #' @param rv.times Optional RV/MIRV times. If \code{NULL}, \code{plot.times}
 #'   are used when supplied; otherwise about five representative fitted times
 #'   are used.
+#' @param rmst Logical; if TRUE, preview RMST horizon settings.
+#' @param fit.times.rmst Optional RMST horizon times. If \code{NULL} and
+#'   \code{rmst = TRUE}, the preview uses \code{max(fit.times)} and reminds
+#'   users that RMST horizons need analyst interpretation.
 #' @param max.fit.times Maximum number of automatic fitted times.
 #' @param max.eval.times Maximum number of automatic nuisance prediction times.
 #' @param G.cutoff Practical reverse-KM censoring-support cutoff for automatic
@@ -45,6 +49,7 @@
 #' @export
 npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
                        plot.times = NULL, rv.times = NULL,
+                       rmst = FALSE, fit.times.rmst = NULL,
                        max.fit.times = 50, max.eval.times = 200,
                        G.cutoff = 0.05, verbose = FALSE) {
 
@@ -79,12 +84,42 @@ npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
                                       label = "rv.times")
     }
 
+    rmst.message <- NULL
+    fit.times.rmst.source <- NULL
+    if (rmst) {
+        if (is.null(fit.times.rmst)) {
+            fit.times.rmst <- max(fit.times)
+            fit.times.rmst.source <- "default"
+            rmst.message <- paste0("RMST horizon was not supplied. Using max(fit.times) = ",
+                                   signif(fit.times.rmst, 4),
+                                   ". Please check whether this RMST horizon is meaningful for your analysis, because RMST requires analyst interpretation.")
+        } else {
+            if (!is.numeric(fit.times.rmst) || any(!is.finite(fit.times.rmst)) || any(fit.times.rmst <= 0)) {
+                stop("`fit.times.rmst` must contain positive finite values.")
+            }
+            if (any(fit.times.rmst > max(fit.times))) {
+                message("Some fit.times.rmst > max(fit.times) - removed for RMST preview.")
+                fit.times.rmst <- fit.times.rmst[fit.times.rmst <= max(fit.times)]
+            }
+            fit.times.rmst <- sort(unique(fit.times.rmst))
+            if (length(fit.times.rmst) == 0) {
+                stop("No `fit.times.rmst` remain within the fitted time range.")
+            }
+            fit.times.rmst.source <- "user"
+        }
+    }
+
     out <- list(fit.times = fit.times,
                 eval.times = eval.times,
                 plot.times = plot.times,
                 rv.times = rv.times,
+                rmst = rmst,
+                fit.times.rmst = fit.times.rmst,
                 time.info = time.rst$time.info,
                 censor.df = time.rst$censor.df)
+    out$time.info$fit.times.rmst <- fit.times.rmst
+    out$time.info$fit.times.rmst.source <- fit.times.rmst.source
+    out$time.info$rmst.message <- rmst.message
     class(out) <- "npsa_times"
     return(out)
 }
@@ -117,6 +152,13 @@ summary.npsa_times <- function(object, digits = 4, ...) {
         cat("plot.times values:", .show.times(object$plot.times), "\n")
     }
     cat("rv.times:", .show.times(object$rv.times), "\n")
+    if (isTRUE(object$rmst)) {
+        cat("fit.times.rmst:", .show.times(object$fit.times.rmst), "\n")
+        cat("fit.times.rmst source:", object$time.info$fit.times.rmst.source, "\n")
+        if (!is.null(object$time.info$rmst.message)) {
+            cat("RMST note:", object$time.info$rmst.message, "\n")
+        }
+    }
     cat("fit.times source:", object$time.info$fit.times.source, "\n")
     cat("upper time source:", object$time.info$upper.time.source, "\n")
     cat("upper time:", signif(object$time.info$upper.time, digits), "\n")
@@ -684,8 +726,8 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
   n <- nrow(IF.vals.l)
   t <- ncol(IF.vals.l)
   if (!is.null(cut.index)){
-      IF.vals.l <- IF.vals.l[,cut.index]
-      IF.vals.u <- IF.vals.u[,cut.index]
+      IF.vals.l <- IF.vals.l[,cut.index, drop = FALSE]
+      IF.vals.u <- IF.vals.u[,cut.index, drop = FALSE]
       t <- ncol(IF.vals.l)
   }
 
@@ -717,8 +759,8 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
 
   library(mvtnorm)
   epsilon <- rmvnorm(n=boot, mean=rep(0, 2*t), sigma = cov.matrix)
-  epsilon.l <- epsilon[,1:t]
-  epsilon.u <- epsilon[,(t+1):(2*t)]
+  epsilon.l <- epsilon[,1:t, drop = FALSE]
+  epsilon.u <- epsilon[,(t+1):(2*t), drop = FALSE]
 
   return(list(epsilon.l=epsilon.l, epsilon.u=epsilon.u))
 }

@@ -13,6 +13,8 @@ npsa_times(
   nuisance.options = list(),
   plot.times = NULL,
   rv.times = NULL,
+  rmst = FALSE,
+  fit.times.rmst = NULL,
   max.fit.times = 50,
   max.eval.times = 200,
   G.cutoff = 0.05,
@@ -40,6 +42,12 @@ are used.}
 are used when supplied; otherwise about five representative fitted times
 are used.}
 
+\item{rmst}{Logical; if TRUE, preview RMST horizon settings.}
+
+\item{fit.times.rmst}{Optional RMST horizon times. If \code{NULL} and
+\code{rmst = TRUE}, the preview uses \code{max(fit.times)} and reminds
+users that RMST horizons need analyst interpretation.}
+
 \item{max.fit.times}{Maximum number of automatic fitted times.}
 
 \item{max.eval.times}{Maximum number of automatic nuisance prediction times.}
@@ -60,8 +68,8 @@ are chosen.}
 }
 \value{
 A list of class \code{npsa_times} containing \code{fit.times},
-\code{eval.times}, \code{plot.times}, \code{rv.times}, \code{time.info},
-and \code{censor.df}.
+\code{eval.times}, \code{plot.times}, \code{rv.times},
+\code{fit.times.rmst}, \code{time.info}, and \code{censor.df}.
 
 For \code{summary()}, invisibly returns \code{object}. For \code{plot()},
 returns a \code{ggplot} object.

@@ -341,6 +341,8 @@ summary.interpretRV <- function(object, ...) {
 #' @param ... Additional arguments.
 #'
 #' @return Invisibly returns \code{object}.
+#' If \code{np_surv(rmst = TRUE)} was used, the summary also prints the RMST
+#' difference table.
 #'
 #' @export
 #' @method summary npSurv
@@ -356,6 +358,14 @@ summary.npSurv <- function(object, digits = 3, ...) {
     if (!is.null(object$uniform.test)) {
         cat("\nUniform no-effect test:\n")
         tbl <- object$uniform.test
+        num.cols <- sapply(tbl, is.numeric)
+        tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
+        print(tbl, row.names = FALSE)
+    }
+
+    if (!is.null(object$rmst.summary)) {
+        cat("\nRMST difference summary:\n")
+        tbl <- object$rmst.summary
         num.cols <- sapply(tbl, is.numeric)
         tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
         print(tbl, row.names = FALSE)
