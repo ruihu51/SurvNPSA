@@ -181,6 +181,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                         tau = result$tau,
                                         S.hat.obs = result$nuisance$event.pred,
                                         g.hat.obs = result$nuisance$prop.pred,
+                                        num_drop = num_drop,
                                         pct_drop = pct_drop,
                                         rep = rep,
                                         seed = sens.seed,
@@ -609,6 +610,8 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
                               senspar.save.path = NULL,
                               seed = 6741,
                               senspar.only = FALSE) {
+    if (!is.null(num_drop) && missing(pct_drop)) pct_drop <- NULL
+
     if (!is.null(senspar.save.path) &&
         (!is.character(senspar.save.path) || length(senspar.save.path) != 1 ||
          is.na(senspar.save.path) || !nzchar(senspar.save.path))) {
