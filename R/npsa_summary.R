@@ -584,7 +584,8 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
         )
 
         bounds.df <- bounds2df(bounds.conf.int, theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
-                               d = NULL, transform = transform, time.zero = TRUE)
+                               d = NULL, transform = transform, time.zero = TRUE,
+                               effect.range = c(-1, 1))
 
         bounds.df.rmst <- NULL
 
@@ -679,7 +680,8 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             )
 
             df <- bounds2df(bounds.conf.int, theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
-                            d = d, transform = transform, time.zero = TRUE)
+                            d = d, transform = transform, time.zero = TRUE,
+                            effect.range = c(-1, 1))
 
             bounds.df <- rbind(bounds.df, df)
 

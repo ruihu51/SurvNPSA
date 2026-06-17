@@ -9,7 +9,8 @@ bounds2df(
   theta.obs,
   d = NULL,
   transform = TRUE,
-  time.zero = TRUE
+  time.zero = TRUE,
+  effect.range = NULL
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ bounds2df(
 \item{transform}{Logical; whether to transform the bounds to survival differences.}
 
 \item{time.zero}{Logical; whether to add a zero starting point at time = 0.}
+
+\item{effect.range}{Optional numeric range for survival difference outputs.}
 }
 \value{
 A \code{data.frame} ready for plotting or reporting.

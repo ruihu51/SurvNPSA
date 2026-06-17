@@ -472,9 +472,13 @@ plot.npsa_times <- function(x, ...) {
 
   # pointwise transformation - correlated
 
-  sigma2.trans.l <- (2/(1-effect.lower^2))^2*sigma2.l
-  sigma2.trans.ul <- (4/((1-effect.lower^2)*(1-effect.upper^2)))*sigma2.ul
-  sigma2.trans.u <- (2/(1-effect.upper^2))^2*sigma2.u
+  trans.bound <- 0.999
+  effect.lower.trans <- pmin(pmax(effect.lower, -trans.bound), trans.bound)
+  effect.upper.trans <- pmin(pmax(effect.upper, -trans.bound), trans.bound)
+
+  sigma2.trans.l <- (2/(1-effect.lower.trans^2))^2*sigma2.l
+  sigma2.trans.ul <- (4/((1-effect.lower.trans^2)*(1-effect.upper.trans^2)))*sigma2.ul
+  sigma2.trans.u <- (2/(1-effect.upper.trans^2))^2*sigma2.u
 
   trans.log <- function(x) log(1+x) - log(1-x)
   trans.log.inv <- function(x) (exp(x)-1)/(exp(x)+1)
@@ -491,8 +495,8 @@ plot.npsa_times <- function(x, ...) {
           c_alpha.trans[t] <- quantile(apply(epsilon, 1, max), conf.level)
       }
 
-      ptwise.trans.l <- trans.log.inv(trans.log(pmin(pmax(effect.lower, -1), 1)) - c_alpha.trans / sqrt(n))
-      ptwise.trans.u <- trans.log.inv(trans.log(pmin(pmax(effect.upper, -1), 1)) + c_alpha.trans / sqrt(n))
+      ptwise.trans.l <- trans.log.inv(trans.log(effect.lower.trans) - c_alpha.trans / sqrt(n))
+      ptwise.trans.u <- trans.log.inv(trans.log(effect.upper.trans) + c_alpha.trans / sqrt(n))
   } else{
       sigma.trans.l <- sqrt(sigma2.trans.l)
       sigma.trans.u <- sqrt(sigma2.trans.u)
@@ -515,12 +519,12 @@ plot.npsa_times <- function(x, ...) {
       }
 
       ptwise.trans.l <- trans.log.inv(
-          trans.log(pmin(pmax(effect.lower, -1), 1)) -
+          trans.log(effect.lower.trans) -
               c_alpha.trans * sigma.trans.l / sqrt(n)
       )
 
       ptwise.trans.u <- trans.log.inv(
-          trans.log(pmin(pmax(effect.upper, -1), 1)) +
+          trans.log(effect.upper.trans) +
               c_alpha.trans * sigma.trans.u / sqrt(n)
       )
   }
@@ -547,8 +551,8 @@ plot.npsa_times <- function(x, ...) {
   IF.trans.l <- IF.vals.effect.lower
   IF.trans.u <- IF.vals.effect.upper
   for(j in 1:length(effect.lower)) {
-      IF.trans.l[,j] <- IF.vals.effect.lower[,j] * (2/(1-effect.lower[j]^2))
-      IF.trans.u[,j] <- IF.vals.effect.upper[,j] * (2/(1-effect.upper[j]^2))
+      IF.trans.l[,j] <- IF.vals.effect.lower[,j] * (2/(1-effect.lower.trans[j]^2))
+      IF.trans.u[,j] <- IF.vals.effect.upper[,j] * (2/(1-effect.upper.trans[j]^2))
   }
   se.trans.l <- sqrt(colMeans(IF.trans.l^2))
   se.trans.u <- sqrt(colMeans(IF.trans.u^2))
@@ -563,9 +567,9 @@ plot.npsa_times <- function(x, ...) {
 
   q_n <- unname(quantile(dist.null.sens, conf.level))
 
-  uniform.trans.l <- trans.log.inv(trans.log(pmin(pmax(effect.lower, -1), 1)) - q_n*se.trans.l / sqrt(n))
+  uniform.trans.l <- trans.log.inv(trans.log(effect.lower.trans) - q_n*se.trans.l / sqrt(n))
   uniform.trans.l[fit.times < band.end.pts[1] | fit.times > band.end.pts[2]] <- NA
-  uniform.trans.u <- trans.log.inv(trans.log(pmin(pmax(effect.upper, -1), 1)) + q_n*se.trans.u / sqrt(n))
+  uniform.trans.u <- trans.log.inv(trans.log(effect.upper.trans) + q_n*se.trans.u / sqrt(n))
   uniform.trans.u[fit.times < band.end.pts[1] | fit.times > band.end.pts[2]] <- NA
 
   res <- list(times=fit.times, effect.lower=effect.lower, effect.upper=effect.upper,
@@ -587,11 +591,13 @@ plot.npsa_times <- function(x, ...) {
 #' @param d Number of dropped confounders (for labeling, optional).
 #' @param transform Logical; whether to transform the bounds to survival differences.
 #' @param time.zero Logical; whether to add a zero starting point at time = 0.
+#' @param effect.range Optional numeric range for survival difference outputs.
 #'
 #' @return A \code{data.frame} ready for plotting or reporting.
 #'
 #' @keywords internal
-bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.zero=TRUE){
+bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE,
+                      time.zero=TRUE, effect.range=NULL){
     if (is.null(d)){
         d=0
     }
@@ -614,6 +620,13 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE, time.z
     bounds.df$effect.upper <- bounds.conf.int$effect.upper
     bounds.df$ptwise.bounds.upper <- bounds.conf.int$ptwise.bounds.upper
     bounds.df$uniform.bounds.upper <- bounds.conf.int$uniform.bounds.upper
+  }
+
+  if (!is.null(effect.range)) {
+      bounds.cols <- setdiff(names(bounds.df), c("times", "d"))
+      for (col in bounds.cols) {
+          bounds.df[[col]] <- pmin(pmax(bounds.df[[col]], effect.range[1]), effect.range[2])
+      }
   }
 
   if (time.zero) {
