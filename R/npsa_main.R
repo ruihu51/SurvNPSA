@@ -35,6 +35,10 @@
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
 #' @param rmst.options List of options for RMST estimation.
 #' @param sens.options List of options for sensitivity parameter simulation.
+#'   Use either \code{pct_drop} for percentage-based dropping or \code{num_drop}
+#'   for exact numbers of covariates to drop, but not both. The default uses
+#'   \code{pct_drop = c(0.3, 0.7)}. The simulation also includes the benchmark
+#'   drop sizes \code{1} and \code{ceiling(0.5 * n_var)} when possible.
 #'   Use \code{senspar.save.path} to save generated sensitivity parameters to
 #'   a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
 #'   parameter simulation.
@@ -610,6 +614,9 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
                               senspar.save.path = NULL,
                               seed = 6741,
                               senspar.only = FALSE) {
+    # Use either pct_drop or num_drop. The simulation also adds d = 1 and
+    # d = ceiling(0.5 * n_var) as benchmark drop sizes when possible.
+    # If num_drop is supplied by itself, use exact drop sizes instead of the default pct_drop.
     if (!is.null(num_drop) && missing(pct_drop)) pct_drop <- NULL
 
     if (!is.null(senspar.save.path) &&

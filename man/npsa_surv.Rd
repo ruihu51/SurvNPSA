@@ -57,6 +57,10 @@ representative fitted times.}
 \item{rmst.options}{List of options for RMST estimation.}
 
 \item{sens.options}{List of options for sensitivity parameter simulation.
+Use either \code{pct_drop} for percentage-based dropping or \code{num_drop}
+for exact numbers of covariates to drop, but not both. The default uses
+\code{pct_drop = c(0.3, 0.7)}. The simulation also includes the benchmark
+drop sizes \code{1} and \code{ceiling(0.5 * n_var)} when possible.
 Use \code{senspar.save.path} to save generated sensitivity parameters to
 a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
 parameter simulation.}
