@@ -4,10 +4,15 @@
 \alias{summary.npSurv}
 \title{Summarize No-Unobserved-Confounding Survival Results}
 \usage{
-\method{summary}{npSurv}(object, digits = 3, ...)
+\method{summary}{npSurv}(object, type = NULL, digits = 3, ...)
 }
 \arguments{
 \item{object}{An object returned by \code{\link{np_surv}()}.}
+
+\item{type}{Which summary to print. Options are \code{"surv.diff"},
+\code{"surv"}, \code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"},
+\code{"rmst"}, and \code{"all"}. If \code{NULL}, the summary keeps the
+original default behavior.}
 
 \item{digits}{Number of digits for printing.}
 

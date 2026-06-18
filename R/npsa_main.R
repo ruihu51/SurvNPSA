@@ -391,8 +391,9 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #' @param save Logical; if TRUE, save intermediate result to \code{dev/result.RData}.
 #'
 #' @return A list of class \code{npSurv}, including \code{time.info} with the
-#'   selected analysis and nuisance time grids. When \code{rmst = TRUE}, the
-#'   returned object also includes \code{rmst.diff.df}.
+#'   selected analysis and nuisance time grids, and \code{summary.tables} with
+#'   clean user-facing summary tables. When \code{rmst = TRUE}, the returned
+#'   object also includes \code{rmst.diff.df}.
 #'
 #' @export
 np_surv <- function(time, event, treat, confounders, fit.times = NULL,
@@ -556,6 +557,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                  rmst.options = rmst.options)),
              cf.out)
     if (rmst) out$rmst.diff.df <- rmst.diff.df
+    out$summary.tables <- .np_surv_summary_tables(out)
 
     class(out) <- "npSurv"
     if (verbose) cat("Finished:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")

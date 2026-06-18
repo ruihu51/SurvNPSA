@@ -55,7 +55,8 @@ need analyst interpretation.}
 }
 \value{
 A list of class \code{npSurv}, including \code{time.info} with the
-selected analysis and nuisance time grids.
+selected analysis and nuisance time grids, and \code{summary.tables} with
+clean user-facing summary tables.
 When \code{rmst = TRUE}, the returned object also includes
 \code{rmst.diff.df}.
 }

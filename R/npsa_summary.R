@@ -653,9 +653,112 @@ summary.npsa_surv <- function(object,
 
 
 
+.np_summary_time_rows <- function(df, report.times, time.col = "time",
+                                  group.col = NULL) {
+    if (is.null(df) || nrow(df) == 0) return(df)
+    if (is.null(report.times) || length(report.times) == 0) return(df)
+
+    out <- data.frame()
+    if (!is.null(group.col) && group.col %in% names(df)) {
+        split.df <- split(df, df[[group.col]])
+    } else {
+        split.df <- list(df)
+    }
+
+    for (one.df in split.df) {
+        if (nrow(one.df) == 0) next
+        idx <- sapply(report.times, function(t0) {
+            which.min(abs(one.df[[time.col]] - t0))
+        })
+        idx <- unique(idx)
+        out <- rbind(out, one.df[idx, , drop = FALSE])
+    }
+    rownames(out) <- NULL
+    out
+}
+
+.np_surv_summary_table <- function(surv.df, report.times) {
+    if (is.null(surv.df) || nrow(surv.df) == 0) return(NULL)
+    df <- .np_summary_time_rows(as.data.frame(surv.df), report.times,
+                                time.col = "time", group.col = "trt")
+
+    if (all(c("ptwise.logit.lower", "ptwise.logit.upper") %in% names(df))) {
+        ptwise.lower <- df$ptwise.logit.lower
+        ptwise.upper <- df$ptwise.logit.upper
+    } else {
+        ptwise.lower <- df$ptwise.lower
+        ptwise.upper <- df$ptwise.upper
+    }
+
+    if (all(c("unif.logit.lower", "unif.logit.upper") %in% names(df))) {
+        unif.lower <- df$unif.logit.lower
+        unif.upper <- df$unif.logit.upper
+    } else if (all(c("unif.ew.lower", "unif.ew.upper") %in% names(df))) {
+        unif.lower <- df$unif.ew.lower
+        unif.upper <- df$unif.ew.upper
+    } else {
+        unif.lower <- unif.upper <- rep(NA_real_, nrow(df))
+    }
+
+    out <- data.frame(time = df$time,
+                      trt = df$trt,
+                      surv = df$surv,
+                      ptwise.lower = ptwise.lower,
+                      ptwise.upper = ptwise.upper,
+                      unif.lower = unif.lower,
+                      unif.upper = unif.upper)
+    rownames(out) <- NULL
+    out
+}
+
+.np_contrast_summary_table <- function(df, report.times, est.name) {
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    df <- as.data.frame(df)
+    time.col <- if ("time" %in% names(df)) "time" else "times"
+    df <- .np_summary_time_rows(df, report.times, time.col = time.col)
+    if (!(est.name %in% names(df))) return(NULL)
+
+    out <- data.frame(time = df[[time.col]])
+    out[[est.name]] <- df[[est.name]]
+    out$ptwise.lower <- if ("ptwise.lower" %in% names(df)) df$ptwise.lower else NA
+    out$ptwise.upper <- if ("ptwise.upper" %in% names(df)) df$ptwise.upper else NA
+    out$unif.lower <- if ("unif.lower" %in% names(df)) df$unif.lower else NA
+    out$unif.upper <- if ("unif.upper" %in% names(df)) df$unif.upper else NA
+    if ("ptwise.pval" %in% names(df)) out$p.value <- df$ptwise.pval
+    rownames(out) <- NULL
+    out
+}
+
+.np_rmst_summary_table <- function(rmst.summary) {
+    if (is.null(rmst.summary) || nrow(rmst.summary) == 0) return(NULL)
+    out <- as.data.frame(rmst.summary)
+    if ("time" %in% names(out)) names(out)[names(out) == "time"] <- "rmst.time"
+    rownames(out) <- NULL
+    out
+}
+
+.np_surv_summary_tables <- function(object) {
+    list(surv = .np_surv_summary_table(object$surv.df, object$report.times),
+         surv.diff = object$ci.summary,
+         surv.ratio = .np_contrast_summary_table(object$surv.ratio.df,
+                                                 object$report.times,
+                                                 "surv.ratio"),
+         risk.ratio = .np_contrast_summary_table(object$risk.ratio.df,
+                                                 object$report.times,
+                                                 "risk.ratio"),
+         nnt = .np_contrast_summary_table(object$nnt.df,
+                                          object$report.times,
+                                          "nnt"),
+         rmst = .np_rmst_summary_table(object$rmst.summary))
+}
+
 #' Summarize No-Unobserved-Confounding Survival Results
 #'
 #' @param object An object returned by \code{\link{np_surv}()}.
+#' @param type Which summary to print. Options are \code{"surv.diff"},
+#'   \code{"surv"}, \code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"},
+#'   \code{"rmst"}, and \code{"all"}. If \code{NULL}, the summary keeps the
+#'   original default behavior.
 #' @param digits Number of digits for printing.
 #' @param ... Additional arguments.
 #'
@@ -665,29 +768,84 @@ summary.npsa_surv <- function(object,
 #'
 #' @export
 #' @method summary npSurv
-summary.npSurv <- function(object, digits = 3, ...) {
-    cat("No-Unobserved-Confounding Survival Report\n")
-    cat("-----------------------------------------\n")
-    cat("\nSurvival difference summary:\n")
-    tbl <- object$ci.summary
-    num.cols <- sapply(tbl, is.numeric)
-    tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
-    print(tbl, row.names = FALSE)
-
-    if (!is.null(object$uniform.test)) {
-        cat("\nUniform no-effect test:\n")
-        tbl <- object$uniform.test
-        num.cols <- sapply(tbl, is.numeric)
-        tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
-        print(tbl, row.names = FALSE)
+summary.npSurv <- function(object, type = NULL, digits = 3, ...) {
+    if (is.numeric(type) && length(type) == 1 && missing(digits)) {
+        digits <- type
+        type <- NULL
+    }
+    if (!is.null(type)) {
+        type <- match.arg(type, c("surv.diff", "surv", "surv.ratio",
+                                  "risk.ratio", "nnt", "rmst", "all"))
     }
 
-    if (!is.null(object$rmst.summary)) {
-        cat("\nRMST difference summary:\n")
-        tbl <- object$rmst.summary
-        num.cols <- sapply(tbl, is.numeric)
-        tbl[, num.cols] <- lapply(tbl[, num.cols, drop = FALSE], function(x) round(x, digits))
-        print(tbl, row.names = FALSE)
+    tables <- object$summary.tables
+    if (is.null(tables)) tables <- .np_surv_summary_tables(object)
+
+    cat("No-Unobserved-Confounding Survival Report\n")
+    cat("-----------------------------------------\n")
+
+    print.surv.diff <- function() {
+        .npsa_print_summary_table("Survival difference summary",
+                                  tables$surv.diff, digits, Inf,
+                                  "object$summary.tables$surv.diff")
+        if (!is.null(object$uniform.test)) {
+            .npsa_print_summary_table("Uniform no-effect test",
+                                      object$uniform.test, digits, Inf)
+        }
+    }
+
+    if (is.null(type)) {
+        print.surv.diff()
+        if (!is.null(tables$rmst)) {
+            .npsa_print_summary_table("RMST difference summary",
+                                      tables$rmst, digits, Inf,
+                                      "object$summary.tables$rmst")
+        }
+    } else if (type == "surv") {
+        .npsa_print_summary_table("Treatment-specific survival summary",
+                                  tables$surv, digits, Inf,
+                                  "object$summary.tables$surv")
+    } else if (type == "surv.diff") {
+        print.surv.diff()
+    } else if (type == "surv.ratio") {
+        .npsa_print_summary_table("Survival ratio summary",
+                                  tables$surv.ratio, digits, Inf,
+                                  "object$summary.tables$surv.ratio")
+    } else if (type == "risk.ratio") {
+        .npsa_print_summary_table("Risk ratio summary",
+                                  tables$risk.ratio, digits, Inf,
+                                  "object$summary.tables$risk.ratio")
+    } else if (type == "nnt") {
+        .npsa_print_summary_table("Number needed to treat summary",
+                                  tables$nnt, digits, Inf,
+                                  "object$summary.tables$nnt")
+    } else if (type == "rmst") {
+        if (is.null(tables$rmst)) {
+            cat("\nRMST summary is not available. Run `np_surv(..., rmst = TRUE)`.\n")
+        } else {
+            .npsa_print_summary_table("RMST difference summary",
+                                      tables$rmst, digits, Inf,
+                                      "object$summary.tables$rmst")
+        }
+    } else if (type == "all") {
+        .npsa_print_summary_table("Treatment-specific survival summary",
+                                  tables$surv, digits, Inf,
+                                  "object$summary.tables$surv")
+        print.surv.diff()
+        .npsa_print_summary_table("Survival ratio summary",
+                                  tables$surv.ratio, digits, Inf,
+                                  "object$summary.tables$surv.ratio")
+        .npsa_print_summary_table("Risk ratio summary",
+                                  tables$risk.ratio, digits, Inf,
+                                  "object$summary.tables$risk.ratio")
+        .npsa_print_summary_table("Number needed to treat summary",
+                                  tables$nnt, digits, Inf,
+                                  "object$summary.tables$nnt")
+        if (!is.null(tables$rmst)) {
+            .npsa_print_summary_table("RMST difference summary",
+                                      tables$rmst, digits, Inf,
+                                      "object$summary.tables$rmst")
+        }
     }
     invisible(object)
 }
