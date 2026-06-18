@@ -1174,8 +1174,11 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
                 IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx, drop = FALSE],
                 IF.vals.psi = result$IF.vals.psi[, obs.est.idx, drop = FALSE],
                 IF.vals.tau = result$IF.vals.tau,
+                rho = rho,
+                band.end.pts = band.end.pts,
                 conf.level = conf.level,
-                scale = scale
+                scale = scale,
+                boot = boot
             )
 
             df <- bounds2df(bounds.conf.int, theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
@@ -1208,8 +1211,11 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
                     IF.vals.theta.obs = result$IF.vals.rmst.obs,
                     IF.vals.psi = result$IF.vals.gamma,
                     IF.vals.tau = result$IF.vals.tau,
+                    rho = rho,
+                    band.end.pts = band.end.pts,
                     conf.level = conf.level,
                     scale = scale,
+                    boot = boot
                 )
 
                 df.rmst <- bounds2df(bounds.conf.int.rmst, theta.obs = result$rmst.obs,

@@ -48,9 +48,11 @@ May include \code{report.times}, \code{uniform.cutpoint}, or an exact
 for plotting.}
 
 \item{rv.options}{List of options for robustness value computation. May include
-\code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
-and \code{uniform.cutpoint} options can be used here for a URV-specific
-window; otherwise URV uses the same window as \code{bound.options}.
+\code{rv.times}, \code{rho}, and \code{theta}. The \code{rho} option is
+also used for sensitivity-bound calculations so bounds and RV use the same
+correlation setting. The \code{uniform.window} and \code{uniform.cutpoint}
+options can be used here for a URV-specific window; otherwise URV uses the
+same window as \code{bound.options}.
 If \code{rv.times = NULL}, RV/MIRV are computed at about five
 representative fitted times.}
 

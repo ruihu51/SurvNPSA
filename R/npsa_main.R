@@ -33,9 +33,11 @@
 #'   \code{uniform.window}. Bounds are still computed over \code{fit.times}
 #'   for plotting.
 #' @param rv.options List of options for robustness value computation. May include
-#'   \code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
-#'   and \code{uniform.cutpoint} options can be used here for a URV-specific
-#'   window; otherwise URV uses the same window as \code{bound.options}.
+#'   \code{rv.times}, \code{rho}, and \code{theta}. The \code{rho} option is
+#'   also used for sensitivity-bound calculations so bounds and RV use the same
+#'   correlation setting. The \code{uniform.window} and \code{uniform.cutpoint}
+#'   options can be used here for a URV-specific window; otherwise URV uses the
+#'   same window as \code{bound.options}.
 #'   If \code{rv.times = NULL}, RV/MIRV are computed at about five
 #'   representative fitted times.
 #' @param rmst Logical; if TRUE, estimate RMST and its bounds inference as well.
@@ -304,12 +306,13 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(bound.times, result, rmst = rmst, transform = transform,
+    bounds.df <- .report.bounds(bound.times, result, rho = rho, rmst = rmst, transform = transform,
                                 scale = scale, band.end.pts = uniform.window)
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     bounds.df.sens <- .report.bounds(bound.times, result,
+                                rho = rho,
                                 sens.df.mean = senspar.df$sens.df.mean,
                                 num_drop = num_drop,
                                 pct_drop = pct_drop,
