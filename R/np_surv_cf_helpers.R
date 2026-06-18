@@ -529,6 +529,8 @@
         if ("ptwise.trans.lower" %in% names(surv.diff.df)) {
             out <- data.frame(time = surv.diff.df$times[idx],
                               surv.diff = surv.diff.df$theta.obs[idx],
+                              lower.bound = surv.diff.df$effect.lower[idx],
+                              upper.bound = surv.diff.df$effect.upper[idx],
                               ptwise.lower = surv.diff.df$ptwise.trans.lower[idx],
                               ptwise.upper = surv.diff.df$ptwise.trans.upper[idx],
                               unif.lower = surv.diff.df$uniform.trans.lower[idx],
@@ -536,6 +538,8 @@
         } else {
             out <- data.frame(time = surv.diff.df$times[idx],
                               surv.diff = surv.diff.df$theta.obs[idx],
+                              lower.bound = surv.diff.df$effect.lower[idx],
+                              upper.bound = surv.diff.df$effect.upper[idx],
                               ptwise.lower = surv.diff.df$ptwise.bounds.lower[idx],
                               ptwise.upper = surv.diff.df$ptwise.bounds.upper[idx],
                               unif.lower = surv.diff.df$uniform.bounds.lower[idx],
@@ -549,6 +553,10 @@
     idx <- sapply(report.times, function(x) which.min(abs(surv.diff.df$time - x)))
     idx <- unique(idx)
     out <- surv.diff.df[idx, c("time", "surv.diff", "ptwise.lower", "ptwise.upper", "ptwise.pval")]
+    out$lower.bound <- out$surv.diff
+    out$upper.bound <- out$surv.diff
+    out <- out[, c("time", "surv.diff", "lower.bound", "upper.bound",
+                   "ptwise.lower", "ptwise.upper", "ptwise.pval")]
     out$ci.includes.0 <- out$ptwise.lower <= 0 & out$ptwise.upper >= 0
     rownames(out) <- NULL
     return(out)

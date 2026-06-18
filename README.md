@@ -41,7 +41,7 @@ The main time options are:
 
 - `fit.times`: the main analysis grid where survival and effect estimates are computed.
 - `nuisance.options$eval.times`: the internal prediction grid for nuisance survival models; most users should not set this.
-- `bound.options$report.times`: times reported for sensitivity bounds; defaults to all fitted times.
+- `bound.options$report.times`: times used for reports and default RV/MIRV reporting; sensitivity bound plots use all `fit.times`.
 - `rv.options$rv.times`: times where RV/MIRV are computed; defaults to `report.times` when users set `report.times`, otherwise about five representative fitted times.
 - `bound.options$uniform.cutpoint` or `bound.options$uniform.window`: defines the uniform inference window; it is not a set of pointwise output times.
 - `rv.options$uniform.window` or `rv.options$uniform.cutpoint`: optional URV-only window override.
@@ -110,7 +110,9 @@ npsa_out <- npsa_surv(time, event, treat, confounders,
 ```
 
 In general, choose `fit.times` first. Then choose `report.times` and
-`rv.times` from `fit.times`.
+`rv.times` from `fit.times`. Bound plots use the fitted grid, while
+`report.times` controls the smaller set of times highlighted in summaries
+and default RV/MIRV reporting.
 
 ## Codes Structure
 

@@ -332,6 +332,325 @@ summary.interpretRV <- function(object, ...) {
     invisible(object)
 }
 
+.npsa_sp_from_rv <- function(x) {
+    out <- x^2 / (1 - x)
+    out[is.nan(out)] <- NA
+    out
+}
+
+.npsa_summary_time_rows <- function(df, report.times, time.col = "times") {
+    if (is.null(df) || nrow(df) == 0) return(df)
+    if (is.null(report.times) || length(report.times) == 0) return(df)
+
+    out <- data.frame()
+    if ("d" %in% names(df)) {
+        split.df <- split(df, df$d)
+    } else {
+        split.df <- list(df)
+    }
+
+    for (one.df in split.df) {
+        if (nrow(one.df) == 0) next
+        idx <- sapply(report.times, function(t0) {
+            which.min(abs(one.df[[time.col]] - t0))
+        })
+        idx <- unique(idx)
+        out <- rbind(out, one.df[idx, , drop = FALSE])
+    }
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_bounds_summary_table <- function(df, report.times = NULL,
+                                       effect.name = "surv.diff",
+                                       include.d = TRUE) {
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    df <- as.data.frame(df)
+    df <- .npsa_summary_time_rows(df, report.times, time.col = "times")
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    if ("ptwise.trans.lower" %in% names(df)) {
+        ptwise.lower <- df$ptwise.trans.lower
+        ptwise.upper <- df$ptwise.trans.upper
+        unif.lower <- df$uniform.trans.lower
+        unif.upper <- df$uniform.trans.upper
+    } else {
+        ptwise.lower <- df$ptwise.bounds.lower
+        ptwise.upper <- df$ptwise.bounds.upper
+        unif.lower <- df$uniform.bounds.lower
+        unif.upper <- df$uniform.bounds.upper
+    }
+
+    out <- data.frame(time = df$times)
+    if (include.d && "d" %in% names(df)) out$d <- df$d
+    out[[effect.name]] <- df$theta.obs
+    out$lower.bound <- df$effect.lower
+    out$upper.bound <- df$effect.upper
+    out$ptwise.lower <- ptwise.lower
+    out$ptwise.upper <- ptwise.upper
+    out$unif.lower <- unif.lower
+    out$unif.upper <- unif.upper
+    out$ci.includes.0 <- out$ptwise.lower <= 0 & out$ptwise.upper >= 0
+
+    if (effect.name == "rmst.diff") names(out)[names(out) == "time"] <- "rmst.time"
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_senspar_summary_table <- function(senspar.df, report.times = NULL) {
+    if (is.null(senspar.df) || is.null(senspar.df$sens.df.mean)) return(NULL)
+    df <- as.data.frame(senspar.df$sens.df.mean)
+    if (nrow(df) == 0) return(NULL)
+    df <- .npsa_summary_time_rows(df, report.times, time.col = "t")
+
+    drop.info <- NULL
+    if (!is.null(senspar.df$drop.sets)) {
+        drop.info <- as.data.frame(senspar.df$drop.sets)
+    } else if (!is.null(senspar.df$sens.df) && "drop.name" %in% names(senspar.df$sens.df)) {
+        drop.info <- unique(as.data.frame(senspar.df$sens.df[, c("j", "d", "drop.name")]))
+    }
+
+    n.drop.sets <- rep(NA_integer_, nrow(df))
+    drop.examples <- rep(NA_character_, nrow(df))
+
+    if (!is.null(drop.info) && nrow(drop.info) > 0) {
+        for (i in seq_len(nrow(df))) {
+            tmp <- drop.info[drop.info$d == df$d[i], , drop = FALSE]
+            n.drop.sets[i] <- length(unique(tmp$j))
+            if ("drop.name" %in% names(tmp)) {
+                examples <- unique(tmp$drop.name)
+            } else if ("drop.index" %in% names(tmp)) {
+                examples <- unique(tmp$drop.index)
+            } else {
+                examples <- character(0)
+            }
+            examples <- examples[!is.na(examples) & nzchar(examples)]
+            if (length(examples) > 0) {
+                drop.examples[i] <- paste(head(examples, 3), collapse = " | ")
+            }
+        }
+    }
+
+    out <- data.frame(time = df$t,
+                      d = df$d,
+                      senspar = df$sens.par,
+                      n.drop.sets = n.drop.sets,
+                      drop.examples = drop.examples)
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_rv_summary_table <- function(res.RV) {
+    if (is.null(res.RV) || is.null(res.RV$res.table)) return(NULL)
+    df <- as.data.frame(res.RV$res.table)
+    if (nrow(df) == 0) return(NULL)
+
+    out <- data.frame(time = df$t0,
+                      theta = df$theta,
+                      rho = if ("rho" %in% names(df)) df$rho else NA,
+                      RV = df$RV,
+                      MIRV = df$MIRV,
+                      sp.RV = .npsa_sp_from_rv(df$RV),
+                      sp.MIRV = .npsa_sp_from_rv(df$MIRV),
+                      lower.b = if ("lower.b" %in% names(df)) df$lower.b else NA)
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_urv_summary_table <- function(res.RV, fit.times = NULL) {
+    if (is.null(res.RV) || is.null(res.RV$unif.RV)) return(NULL)
+
+    if (!is.null(res.RV$uniform.window)) {
+        t.lower <- res.RV$uniform.window[1]
+        t.upper <- res.RV$uniform.window[2]
+    } else if (!is.null(res.RV$unif.idx) && !is.null(fit.times)) {
+        t.lower <- min(fit.times[res.RV$unif.idx], na.rm = TRUE)
+        t.upper <- max(fit.times[res.RV$unif.idx], na.rm = TRUE)
+    } else {
+        t.lower <- NA
+        t.upper <- NA
+    }
+
+    out <- data.frame(t.lower = t.lower,
+                      t.upper = t.upper,
+                      URV = res.RV$unif.RV,
+                      sp.URV = .npsa_sp_from_rv(res.RV$unif.RV),
+                      window.source = if (is.null(res.RV$uniform.window.source)) NA else res.RV$uniform.window.source)
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_time_summary_table <- function(object) {
+    time.info <- object$time.info
+    if (is.null(time.info)) return(NULL)
+
+    show.times <- function(x) {
+        if (is.null(x)) return(NA_character_)
+        if (length(x) == 0) return("")
+        x <- signif(x, 4)
+        if (length(x) <= 6) {
+            paste(x, collapse = ", ")
+        } else {
+            paste0(paste(x[1:6], collapse = ", "), ", ...")
+        }
+    }
+
+    out <- data.frame(
+        item = c("fit.times", "report.times", "rv.times", "uniform.window"),
+        n = c(length(time.info$fit.times),
+              length(time.info$report.times),
+              length(time.info$rv.times),
+              length(time.info$uniform.window)),
+        values = c(show.times(time.info$fit.times),
+                   show.times(time.info$report.times),
+                   show.times(time.info$rv.times),
+                   show.times(time.info$uniform.window))
+    )
+    rownames(out) <- NULL
+    out
+}
+
+.npsa_surv_summary_tables <- function(object) {
+    report.times <- object$time.info$report.times
+    out <- list(time.settings = .npsa_time_summary_table(object))
+
+    if (!is.null(object$bounds.df) && !is.null(object$bounds.df$bounds.df)) {
+        bounds.raw <- object$bounds.df$bounds.df
+        out$surv.diff <- .npsa_bounds_summary_table(
+            bounds.raw[bounds.raw$d == 0, , drop = FALSE],
+            report.times = report.times,
+            effect.name = "surv.diff",
+            include.d = FALSE
+        )
+        out$bounds <- .npsa_bounds_summary_table(
+            bounds.raw[bounds.raw$d != 0, , drop = FALSE],
+            report.times = report.times,
+            effect.name = "surv.diff",
+            include.d = TRUE
+        )
+    }
+
+    out$senspar <- .npsa_senspar_summary_table(object$senspar.df, report.times)
+    out$rv <- .npsa_rv_summary_table(object$res.RV)
+    out$urv <- .npsa_urv_summary_table(object$res.RV, object$result$fit.times)
+
+    if (!is.null(object$bounds.df) && !is.null(object$bounds.df$bounds.df.rmst)) {
+        out$rmst <- .npsa_bounds_summary_table(
+            object$bounds.df$bounds.df.rmst,
+            report.times = NULL,
+            effect.name = "rmst.diff",
+            include.d = TRUE
+        )
+    }
+
+    out
+}
+
+.npsa_print_summary_table <- function(title, tbl, digits = 3,
+                                      max.rows = 12, object.name = NULL) {
+    cat("\n", title, ":\n", sep = "")
+    if (is.null(tbl) || nrow(tbl) == 0) {
+        cat("Not available.\n")
+        return(invisible(NULL))
+    }
+
+    tbl.print <- tbl
+    n.more <- 0
+    if (is.finite(max.rows) && nrow(tbl.print) > max.rows) {
+        n.more <- nrow(tbl.print) - max.rows
+        tbl.print <- tbl.print[seq_len(max.rows), , drop = FALSE]
+    }
+
+    num.cols <- sapply(tbl.print, is.numeric)
+    tbl.print[, num.cols] <- lapply(tbl.print[, num.cols, drop = FALSE], function(x) round(x, digits))
+    print(tbl.print, row.names = FALSE)
+
+    if (n.more > 0) {
+        if (is.null(object.name)) {
+            cat("... ", n.more, " more rows not printed.\n", sep = "")
+        } else {
+            cat("... ", n.more, " more rows not printed. See ", object.name, ".\n", sep = "")
+        }
+    }
+    invisible(tbl)
+}
+
+#' Summarize NPSA Survival Sensitivity Results
+#'
+#' @param object An object returned by \code{\link{npsa_surv}()}.
+#' @param type Which summary to print. Options are \code{"overview"},
+#'   \code{"bounds"}, \code{"senspar"}, \code{"rv"}, \code{"rmst"}, and
+#'   \code{"all"}.
+#' @param digits Number of digits for printing.
+#' @param ... Additional arguments.
+#'
+#' @return Invisibly returns \code{object}. Clean user-facing tables are also
+#'   stored in \code{object$summary.tables}.
+#'
+#' @export
+#' @method summary npsa_surv
+summary.npsa_surv <- function(object,
+                              type = c("overview", "bounds", "senspar", "rv", "rmst", "all"),
+                              digits = 3, ...) {
+    type <- match.arg(type)
+
+    tables <- object$summary.tables
+    if (is.null(tables)) tables <- .npsa_surv_summary_tables(object)
+
+    cat("NPSA Survival Sensitivity Report\n")
+    cat("--------------------------------\n")
+
+    max.rows <- if (type == "all") Inf else 12
+
+    if (type %in% c("overview", "all")) {
+        .npsa_print_summary_table("Time settings", tables$time.settings, digits, max.rows,
+                                  "object$summary.tables$time.settings")
+        .npsa_print_summary_table("No-unobserved-confounding survival difference",
+                                  tables$surv.diff, digits, max.rows,
+                                  "object$summary.tables$surv.diff")
+
+        if (!is.null(object$senspar.df$meta)) {
+            cat("\nSensitivity parameter simulation:\n")
+            cat("rep:", object$senspar.df$meta$rep, "\n")
+            cat("seed:", object$senspar.df$meta$seed, "\n")
+            if (!is.null(tables$senspar)) {
+                cat("d:", paste(unique(tables$senspar$d), collapse = ", "), "\n")
+            }
+        }
+        .npsa_print_summary_table("Sensitivity parameter summary", tables$senspar,
+                                  digits, max.rows, "object$summary.tables$senspar")
+        .npsa_print_summary_table("Sensitivity bounds", tables$bounds,
+                                  digits, max.rows, "object$summary.tables$bounds")
+        .npsa_print_summary_table("RV and MIRV", tables$rv,
+                                  digits, max.rows, "object$summary.tables$rv")
+        .npsa_print_summary_table("Uniform RV", tables$urv,
+                                  digits, max.rows, "object$summary.tables$urv")
+        if (!is.null(tables$rmst)) {
+            .npsa_print_summary_table("RMST difference", tables$rmst,
+                                      digits, max.rows, "object$summary.tables$rmst")
+        }
+    } else if (type == "bounds") {
+        .npsa_print_summary_table("No-unobserved-confounding survival difference",
+                                  tables$surv.diff, digits, max.rows,
+                                  "object$summary.tables$surv.diff")
+        .npsa_print_summary_table("Sensitivity bounds", tables$bounds,
+                                  digits, max.rows, "object$summary.tables$bounds")
+    } else if (type == "senspar") {
+        .npsa_print_summary_table("Sensitivity parameter summary", tables$senspar,
+                                  digits, max.rows, "object$summary.tables$senspar")
+    } else if (type == "rv") {
+        .npsa_print_summary_table("RV and MIRV", tables$rv,
+                                  digits, max.rows, "object$summary.tables$rv")
+        .npsa_print_summary_table("Uniform RV", tables$urv,
+                                  digits, max.rows, "object$summary.tables$urv")
+    } else if (type == "rmst") {
+        .npsa_print_summary_table("RMST difference", tables$rmst,
+                                  digits, max.rows, "object$summary.tables$rmst")
+    }
+
+    invisible(object)
+}
+
 
 
 #' Summarize No-Unobserved-Confounding Survival Results
@@ -542,19 +861,19 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
 #' Estimate observed components
 #'
 #' @keywords internal
-.report.bounds <- function(report.times, result, rho=1, band.end.pts = c(0,Inf), conf.level=.95, boot=10000,
+.report.bounds <- function(bound.times, result, rho=1, band.end.pts = c(0,Inf), conf.level=.95, boot=10000,
                            sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
                            rmst = TRUE, sens.rmst.df.mean = NULL, transform = TRUE, scale = TRUE) {
 
-    if (is.null(report.times)) report.times <- result$fit.times
-    if (any(report.times > max(result$fit.times))) {
-        message("Some report.times > maximum observed event time - removed for report.")
-        report.times <- report.times[report.times <= max(result$fit.times)]
+    if (is.null(bound.times)) bound.times <- result$fit.times
+    if (any(bound.times > max(result$fit.times))) {
+        message("Some bound.times > maximum observed event time - removed for bounds.")
+        bound.times <- bound.times[bound.times <= max(result$fit.times)]
     }
 
     if (is.null(sens.df.mean)) {
 
-        obs.est.idx <- sapply(report.times, function(x) {
+        obs.est.idx <- sapply(bound.times, function(x) {
             which(near(x, result$fit.times))
         })
 
@@ -564,7 +883,7 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
             psi = result$obs.comps.df$psi[obs.est.idx],
             tau = result$tau,
-            sens.out = rep(0, length(report.times)),
+            sens.out = rep(0, length(bound.times)),
             sens.trt = 0,
             rho = rho
         )
@@ -650,11 +969,11 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             sens.out.true.input <- as.vector(sens.df.mean[sens.df.mean$d == d, "sens.par"])$sens.par
             sens.trt.true <- 1
 
-            senspar.idx <- sapply(report.times, function(x) {
+            senspar.idx <- sapply(bound.times, function(x) {
                 which(near(x, sens.df.mean$t[sens.df.mean$d == d]))
             })
 
-            obs.est.idx <- sapply(report.times, function(x) {
+            obs.est.idx <- sapply(bound.times, function(x) {
                 which(near(x, result$fit.times))
             })
 
@@ -726,6 +1045,24 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
         return(list(bounds.df = bounds.df, bounds.df.rmst = bounds.df.rmst))
 
     }
+}
+
+#' Plot NPSA Survival Sensitivity Bounds
+#'
+#' Plot method for objects returned by \code{\link{npsa_surv}()}.
+#'
+#' @param x An object returned by \code{\link{npsa_surv}()}.
+#' @param ... Additional arguments passed to \code{\link{plot.boundsdf}()}.
+#'
+#' @return A \code{ggplot} object showing sensitivity bounds.
+#'
+#' @export
+#' @method plot npsa_surv
+plot.npsa_surv <- function(x, ...) {
+    if (is.null(x$bounds.df) || is.null(x$bounds.df$bounds.df)) {
+        stop("`x` does not contain bounds results. If `senspar.only = TRUE`, run `npsa_surv()` again without `senspar.only` before plotting.")
+    }
+    plot(x$bounds.df$bounds.df, ...)
 }
 
 #' Plot boundsdf object

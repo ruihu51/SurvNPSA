@@ -13,6 +13,10 @@
 #' need to set \code{nuisance.options$eval.times}; it is an internal prediction
 #' grid and is chosen automatically when omitted.
 #'
+#' Sensitivity bound curves are computed over \code{fit.times} for plotting.
+#' \code{bound.options$report.times} controls reported time summaries and the
+#' default \code{rv.options$rv.times} when RV/MIRV times are not supplied.
+#'
 #' @param time Numeric vector of event or censoring times.
 #' @param event Numeric vector of event indicators (1 = event, 0 = censored).
 #' @param treat Numeric vector of treatment assignment indicators (1 = treated, 0 = control).
@@ -25,7 +29,9 @@
 #'   May include \code{psi.type} and \code{tau.type}.
 #' @param bound.options List of options for reporting pointwise and uniform bounds.
 #'   The \code{transform} option is also used for pointwise MIRV calculation.
-#'   May include \code{uniform.cutpoint} or an exact \code{uniform.window}.
+#'   May include \code{report.times}, \code{uniform.cutpoint}, or an exact
+#'   \code{uniform.window}. Bounds are still computed over \code{fit.times}
+#'   for plotting.
 #' @param rv.options List of options for robustness value computation. May include
 #'   \code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
 #'   and \code{uniform.cutpoint} options can be used here for a URV-specific
@@ -56,6 +62,7 @@
 #'   \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 #'   \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 #'   \item{res.RV}{Robustness values at specified or default representative times.}
+#'   \item{summary.tables}{User-facing summary tables with clearer column names.}
 #'   \item{var_names}{Confounder names used by interpretation helpers.}
 #'   \item{time.info}{Time grids used for analysis and nuisance estimation.}
 #' }
@@ -233,6 +240,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                     senspar.df = senspar.df,
                     var_names = var_names,
                     time.info = time.info)
+        out$summary.tables <- .npsa_surv_summary_tables(out)
         class(out) <- "npsa_surv"
         if (verbose) cat("Finished after sensitivity parameter simulation:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         return(out)
@@ -279,6 +287,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     time.info$uniform.window <- uniform.window
     time.info$uniform.window.source <- uniform.window.source
     time.info$uniform.cutpoint <- uniform.cutpoint
+    bound.times <- result$fit.times
     urv.window <- uniform.window
     urv.window.source <- uniform.window.source
     if (!is.null(rv.uniform.window)) {
@@ -295,12 +304,12 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(report.times, result, rmst = rmst, transform = transform,
+    bounds.df <- .report.bounds(bound.times, result, rmst = rmst, transform = transform,
                                 scale = scale, band.end.pts = uniform.window)
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df.sens <- .report.bounds(report.times, result,
+    bounds.df.sens <- .report.bounds(bound.times, result,
                                 sens.df.mean = senspar.df$sens.df.mean,
                                 num_drop = num_drop,
                                 pct_drop = pct_drop,
@@ -337,6 +346,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         out$res.RV$uniform.window.source <- urv.window.source
     }
 
+    out$summary.tables <- .npsa_surv_summary_tables(out)
     class(out) <- "npsa_surv"
     if (verbose) cat("Finished:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
     return(out)

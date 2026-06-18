@@ -43,7 +43,9 @@ May include \code{psi.type} and \code{tau.type}.}
 
 \item{bound.options}{List of options for reporting pointwise and uniform bounds.
 The \code{transform} option is also used for pointwise MIRV calculation.
-May include \code{uniform.cutpoint} or an exact \code{uniform.window}.}
+May include \code{report.times}, \code{uniform.cutpoint}, or an exact
+\code{uniform.window}. Bounds are still computed over \code{fit.times}
+for plotting.}
 
 \item{rv.options}{List of options for robustness value computation. May include
 \code{rv.times}, \code{rho}, and \code{theta}. The \code{uniform.window}
@@ -83,6 +85,7 @@ A list of class \code{npsa_surv} containing:
 \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 \item{res.RV}{Robustness values at specified or default representative times.}
+\item{summary.tables}{User-facing summary tables with clearer column names.}
 \item{var_names}{Confounder names used by interpretation helpers.}
 \item{time.info}{Time grids used for analysis and nuisance estimation.}
 }
@@ -101,6 +104,10 @@ censoring support is very weak. The censoring-support cutoff is a practical
 safety default, not a change to the statistical formulas. Most users do not
 need to set \code{nuisance.options$eval.times}; it is an internal prediction
 grid and is chosen automatically when omitted.
+
+Sensitivity bound curves are computed over \code{fit.times} for plotting.
+\code{bound.options$report.times} controls reported time summaries and the
+default \code{rv.options$rv.times} when RV/MIRV times are not supplied.
 }
 \examples{
 # Simulate toy data and fit sensitivity bounds (see package vignettes for full examples)
