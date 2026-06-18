@@ -5,7 +5,7 @@
 \title{Estimate observed components}
 \usage{
 .report.bounds(
-  plot.times,
+  report.times,
   result,
   rho = 1,
   band.end.pts = c(0, Inf),

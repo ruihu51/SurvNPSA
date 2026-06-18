@@ -11,7 +11,7 @@ npsa_times(
   event,
   fit.times = NULL,
   nuisance.options = list(),
-  plot.times = NULL,
+  report.times = NULL,
   rv.times = NULL,
   rmst = FALSE,
   fit.times.rmst = NULL,
@@ -35,10 +35,10 @@ npsa_times(
 \item{nuisance.options}{Optional nuisance options. If
 \code{nuisance.options$eval.times} is supplied, it is preserved.}
 
-\item{plot.times}{Optional reporting times. If \code{NULL}, all fitted times
+\item{report.times}{Optional reporting times. If \code{NULL}, all fitted times
 are used.}
 
-\item{rv.times}{Optional RV/MIRV times. If \code{NULL}, \code{plot.times}
+\item{rv.times}{Optional RV/MIRV times. If \code{NULL}, \code{report.times}
 are used when supplied; otherwise about five representative fitted times
 are used.}
 
@@ -68,7 +68,7 @@ are chosen.}
 }
 \value{
 A list of class \code{npsa_times} containing \code{fit.times},
-\code{eval.times}, \code{plot.times}, \code{rv.times},
+\code{eval.times}, \code{report.times}, \code{rv.times},
 \code{fit.times.rmst}, \code{time.info}, and \code{censor.df}.
 
 For \code{summary()}, invisibly returns \code{object}. For \code{plot()},
@@ -87,7 +87,7 @@ plot(time.out)
 
 time.out <- npsa_times(time, event,
                        fit.times = seq(0.1, 1.2, by = 0.1),
-                       plot.times = c(0.2, 0.6, 1.0),
+                       report.times = c(0.2, 0.6, 1.0),
                        rv.times = c(0.2, 0.6, 1.0))
 summary(time.out)
 

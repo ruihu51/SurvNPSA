@@ -542,19 +542,19 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
 #' Estimate observed components
 #'
 #' @keywords internal
-.report.bounds <- function(plot.times, result, rho=1, band.end.pts = c(0,Inf), conf.level=.95, boot=10000,
+.report.bounds <- function(report.times, result, rho=1, band.end.pts = c(0,Inf), conf.level=.95, boot=10000,
                            sens.df.mean = NULL, num_drop = NULL, pct_drop = NULL, n_var = NULL,
                            rmst = TRUE, sens.rmst.df.mean = NULL, transform = TRUE, scale = TRUE) {
 
-    if (is.null(plot.times)) plot.times <- result$fit.times
-    if (any(plot.times > max(result$fit.times))) {
-        message("Some plot.times > maximum observed event time - removed for plot.")
-        plot.times <- plot.times[plot.times <= max(result$fit.times)]
+    if (is.null(report.times)) report.times <- result$fit.times
+    if (any(report.times > max(result$fit.times))) {
+        message("Some report.times > maximum observed event time - removed for report.")
+        report.times <- report.times[report.times <= max(result$fit.times)]
     }
 
     if (is.null(sens.df.mean)) {
 
-        obs.est.idx <- sapply(plot.times, function(x) {
+        obs.est.idx <- sapply(report.times, function(x) {
             which(near(x, result$fit.times))
         })
 
@@ -564,7 +564,7 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             theta.obs = result$obs.comps.df$theta.obs[obs.est.idx],
             psi = result$obs.comps.df$psi[obs.est.idx],
             tau = result$tau,
-            sens.out = rep(0, length(plot.times)),
+            sens.out = rep(0, length(report.times)),
             sens.trt = 0,
             rho = rho
         )
@@ -573,8 +573,8 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             effect.bounds,
             psi = result$obs.comps.df$psi[obs.est.idx],
             tau = result$tau,
-            IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx],
-            IF.vals.psi = result$IF.vals.psi[, obs.est.idx],
+            IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx, drop = FALSE],
+            IF.vals.psi = result$IF.vals.psi[, obs.est.idx, drop = FALSE],
             IF.vals.tau = result$IF.vals.tau,
             rho = rho,
             band.end.pts = band.end.pts,
@@ -650,11 +650,11 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
             sens.out.true.input <- as.vector(sens.df.mean[sens.df.mean$d == d, "sens.par"])$sens.par
             sens.trt.true <- 1
 
-            senspar.idx <- sapply(plot.times, function(x) {
+            senspar.idx <- sapply(report.times, function(x) {
                 which(near(x, sens.df.mean$t[sens.df.mean$d == d]))
             })
 
-            obs.est.idx <- sapply(plot.times, function(x) {
+            obs.est.idx <- sapply(report.times, function(x) {
                 which(near(x, result$fit.times))
             })
 
@@ -672,8 +672,8 @@ plot.npSurv <- function(x, type = c("surv", "surv.diff", "surv.ratio", "risk.rat
                 effect.bounds,
                 psi = result$obs.comps.df$psi[obs.est.idx],
                 tau = result$tau,
-                IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx],
-                IF.vals.psi = result$IF.vals.psi[, obs.est.idx],
+                IF.vals.theta.obs = result$IF.vals.theta.obs[, obs.est.idx, drop = FALSE],
+                IF.vals.psi = result$IF.vals.psi[, obs.est.idx, drop = FALSE],
                 IF.vals.tau = result$IF.vals.tau,
                 conf.level = conf.level,
                 scale = scale

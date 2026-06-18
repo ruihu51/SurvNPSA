@@ -9,9 +9,9 @@
 #' @param fit.times Optional user-provided analysis times.
 #' @param nuisance.options Optional nuisance options. If
 #'   \code{nuisance.options$eval.times} is supplied, it is preserved.
-#' @param plot.times Optional reporting times. If \code{NULL}, all fitted times
+#' @param report.times Optional reporting times. If \code{NULL}, all fitted times
 #'   are used.
-#' @param rv.times Optional RV/MIRV times. If \code{NULL}, \code{plot.times}
+#' @param rv.times Optional RV/MIRV times. If \code{NULL}, \code{report.times}
 #'   are used when supplied; otherwise about five representative fitted times
 #'   are used.
 #' @param rmst Logical; if TRUE, preview RMST horizon settings.
@@ -26,7 +26,7 @@
 #'   are chosen.
 #'
 #' @return A list of class \code{npsa_times} containing \code{fit.times},
-#'   \code{eval.times}, \code{plot.times}, \code{rv.times}, \code{time.info},
+#'   \code{eval.times}, \code{report.times}, \code{rv.times}, \code{time.info},
 #'   and \code{censor.df}.
 #'
 #' @examples
@@ -37,7 +37,7 @@
 #'
 #' time.out <- npsa_times(time, event,
 #'                        fit.times = seq(0.1, 1.2, by = 0.1),
-#'                        plot.times = c(0.2, 0.6, 1.0),
+#'                        report.times = c(0.2, 0.6, 1.0),
 #'                        rv.times = c(0.2, 0.6, 1.0))
 #' summary(time.out)
 #'
@@ -48,7 +48,7 @@
 #'
 #' @export
 npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
-                       plot.times = NULL, rv.times = NULL,
+                       report.times = NULL, rv.times = NULL,
                        rmst = FALSE, fit.times.rmst = NULL,
                        max.fit.times = 50, max.eval.times = 200,
                        G.cutoff = 0.05, verbose = FALSE) {
@@ -62,9 +62,9 @@ npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
     fit.times <- time.rst$fit.times
     eval.times <- time.rst$nuisance.options$eval.times
 
-    if (is.null(plot.times)) {
-        plot.times <- .get.report.times(plot.times, fit.times, default.all = TRUE,
-                                        label = "plot.times")
+    if (is.null(report.times)) {
+        report.times <- .get.report.times(report.times, fit.times, default.all = TRUE,
+                                        label = "report.times")
         if (is.null(rv.times)) {
             rv.times <- fit.times
             if (length(rv.times) > 5) {
@@ -73,10 +73,10 @@ npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
             }
         }
     } else {
-        plot.times <- .get.report.times(plot.times, fit.times, default.all = TRUE,
-                                        label = "plot.times")
+        report.times <- .get.report.times(report.times, fit.times, default.all = TRUE,
+                                        label = "report.times")
         if (is.null(rv.times)) {
-            rv.times <- plot.times
+            rv.times <- report.times
         }
     }
     if (!is.null(rv.times)) {
@@ -111,7 +111,7 @@ npsa_times <- function(time, event, fit.times = NULL, nuisance.options = list(),
 
     out <- list(fit.times = fit.times,
                 eval.times = eval.times,
-                plot.times = plot.times,
+                report.times = report.times,
                 rv.times = rv.times,
                 rmst = rmst,
                 fit.times.rmst = fit.times.rmst,
@@ -147,9 +147,9 @@ summary.npsa_times <- function(object, digits = 4, ...) {
     cat("eval.times:", length(object$eval.times), "from",
         signif(min(object$eval.times), digits), "to",
         signif(max(object$eval.times), digits), "\n")
-    cat("plot.times:", length(object$plot.times), "\n")
-    if (length(object$plot.times) <= 10) {
-        cat("plot.times values:", .show.times(object$plot.times), "\n")
+    cat("report.times:", length(object$report.times), "\n")
+    if (length(object$report.times) <= 10) {
+        cat("report.times values:", .show.times(object$report.times), "\n")
     }
     cat("rv.times:", .show.times(object$rv.times), "\n")
     if (isTRUE(object$rmst)) {
@@ -341,7 +341,7 @@ plot.npsa_times <- function(x, ...) {
 }
 
 .get.report.times <- function(times, fit.times, default.all = TRUE,
-                              label = "plot.times") {
+                              label = "report.times") {
     if (is.null(times)) {
         if (default.all) return(fit.times)
         return(numeric(0))

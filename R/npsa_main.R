@@ -97,7 +97,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     # Extract options
     psi.type <- target.options$psi.type
     tau.type <- target.options$tau.type
-    plot.times <- bound.options$plot.times
+    report.times <- bound.options$report.times
     transform <- bound.options$transform
     scale <- bound.options$scale
     uniform.cutpoint <- bound.options$uniform.cutpoint
@@ -239,9 +239,9 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     }
 
     # Report times and uniform window
-    if (is.null(plot.times)) {
-        plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
-                                        label = "plot.times")
+    if (is.null(report.times)) {
+        report.times <- .get.report.times(report.times, result$fit.times, default.all = TRUE,
+                                        label = "report.times")
         if (is.null(rv.times)) {
             rv.times <- result$fit.times
             if (length(rv.times) > 5) {
@@ -250,10 +250,10 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
             }
         }
     } else {
-        plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
-                                        label = "plot.times")
+        report.times <- .get.report.times(report.times, result$fit.times, default.all = TRUE,
+                                        label = "report.times")
         if (is.null(rv.times)) {
-            rv.times <- plot.times
+            rv.times <- report.times
         }
     }
     if (!is.null(rv.times)) {
@@ -274,7 +274,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     if (!any(result$fit.times >= uniform.window[1] & result$fit.times <= uniform.window[2])) {
         stop("No `fit.times` fall inside `uniform.window`.")
     }
-    time.info$plot.times <- plot.times
+    time.info$report.times <- report.times
     time.info$rv.times <- rv.times
     time.info$uniform.window <- uniform.window
     time.info$uniform.window.source <- uniform.window.source
@@ -295,12 +295,12 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
     # Observed bounds
     if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(plot.times, result, rmst = rmst, transform = transform,
+    bounds.df <- .report.bounds(report.times, result, rmst = rmst, transform = transform,
                                 scale = scale, band.end.pts = uniform.window)
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df.sens <- .report.bounds(plot.times, result,
+    bounds.df.sens <- .report.bounds(report.times, result,
                                 sens.df.mean = senspar.df$sens.df.mean,
                                 num_drop = num_drop,
                                 pct_drop = pct_drop,
@@ -402,7 +402,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     # Extract options
     psi.type <- "hybrid"
     tau.type <- "hybrid"
-    plot.times <- np.options$plot.times
+    report.times <- np.options$report.times
     conf.band <- np.options$conf.band
     conf.level <- np.options$conf.level
     contrasts <- np.options$contrasts
@@ -488,9 +488,9 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
         rmst.options$fit.times.rmst <- result$fit.times.rmst
     }
 
-    plot.times <- .get.report.times(plot.times, result$fit.times, default.all = TRUE,
-                                    label = "plot.times")
-    time.info$plot.times <- plot.times
+    report.times <- .get.report.times(report.times, result$fit.times, default.all = TRUE,
+                                    label = "report.times")
+    time.info$report.times <- report.times
 
     # Treatment-specific survival and survival contrasts
     cf.contrasts <- setdiff(contrasts, "surv.diff")
@@ -533,13 +533,13 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     time.info$uniform.window.source <- if (is.null(uniform.window)) "uniform.cutpoint" else "uniform.window"
     time.info$uniform.cutpoint <- uniform.cutpoint
 
-    ci.summary <- .np_ci_summary(cf.out$surv.diff.df, plot.times)
+    ci.summary <- .np_ci_summary(cf.out$surv.diff.df, report.times)
 
     out <- c(list(result = result,
                   uniform.test = uniform.test,
                   ci.summary = ci.summary,
                   rmst.summary = rmst.summary,
-                  plot.times = plot.times,
+                  report.times = report.times,
                   var_names = var_names,
                   time.info = time.info,
                   options = list(np.options = np.options,
@@ -554,7 +554,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
 
 #' Options for \code{np_surv()}
 #'
-#' @param plot.times Optional numeric vector of times to summarize and plot.
+#' @param report.times Optional numeric vector of times to summarize and report.
 #'   If \code{NULL}, all fitted times are used.
 #' @param conf.band Logical; if TRUE, compute uniform confidence bands.
 #' @param conf.level Desired confidence level.
@@ -576,13 +576,13 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #' @return A named list of options.
 #'
 #' @export
-np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.95,
+np_surv.options <- function(report.times = NULL, conf.band = TRUE, conf.level = 0.95,
                             contrasts = c("surv.diff", "surv.ratio", "risk.ratio", "nnt"),
                             uniform.cutpoint = c(0.01, 0.99), uniform.window = NULL,
                             isotonize = TRUE, seed = NULL) {
-    if (!is.null(plot.times) &&
-        (!is.numeric(plot.times) || any(!is.finite(plot.times)) || any(plot.times < 0))) {
-        stop("`plot.times` must be NULL or a non-negative numeric vector.")
+    if (!is.null(report.times) &&
+        (!is.numeric(report.times) || any(!is.finite(report.times)) || any(report.times < 0))) {
+        stop("`report.times` must be NULL or a non-negative numeric vector.")
     }
     if (length(conf.band) != 1 || !is.logical(conf.band) || is.na(conf.band)) {
         stop("`conf.band` must be TRUE or FALSE.")
@@ -625,7 +625,7 @@ np_surv.options <- function(plot.times = NULL, conf.band = TRUE, conf.level = 0.
     }
     contrasts <- unique(c("surv.diff", contrasts))
 
-    list(plot.times = plot.times,
+    list(report.times = report.times,
          conf.band = conf.band,
          conf.level = conf.level,
          contrasts = contrasts,
@@ -639,7 +639,7 @@ npsa_target.options <- function(psi.type = "hybrid", tau.type = "hybrid") {
     list(psi.type = psi.type, tau.type = tau.type)
 }
 
-npsa_bound.options <- function(plot.times = NULL, transform = TRUE, scale = TRUE,
+npsa_bound.options <- function(report.times = NULL, transform = TRUE, scale = TRUE,
                                uniform.cutpoint = c(0.01, 0.99),
                                uniform.window = NULL) {
     if (length(uniform.cutpoint) != 2 || !is.numeric(uniform.cutpoint) ||
@@ -653,7 +653,7 @@ npsa_bound.options <- function(plot.times = NULL, transform = TRUE, scale = TRUE
          any(!is.finite(uniform.window)) || uniform.window[1] >= uniform.window[2])) {
         stop("`uniform.window` must be NULL or two increasing finite numbers.")
     }
-    list(plot.times = plot.times, transform = transform, scale = scale,
+    list(report.times = report.times, transform = transform, scale = scale,
          uniform.cutpoint = uniform.cutpoint, uniform.window = uniform.window)
 }
 

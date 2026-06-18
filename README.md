@@ -41,8 +41,8 @@ The main time options are:
 
 - `fit.times`: the main analysis grid where survival and effect estimates are computed.
 - `nuisance.options$eval.times`: the internal prediction grid for nuisance survival models; most users should not set this.
-- `bound.options$plot.times`: times reported for sensitivity bounds; defaults to all fitted times.
-- `rv.options$rv.times`: times where RV/MIRV are computed; defaults to `plot.times` when users set `plot.times`, otherwise about five representative fitted times.
+- `bound.options$report.times`: times reported for sensitivity bounds; defaults to all fitted times.
+- `rv.options$rv.times`: times where RV/MIRV are computed; defaults to `report.times` when users set `report.times`, otherwise about five representative fitted times.
 - `bound.options$uniform.cutpoint` or `bound.options$uniform.window`: defines the uniform inference window; it is not a set of pointwise output times.
 - `rv.options$uniform.window` or `rv.options$uniform.cutpoint`: optional URV-only window override.
 - `rmst.options$fit.times.rmst`: RMST horizons; choose these only when running `npsa_surv(rmst = TRUE)`.
@@ -60,34 +60,34 @@ npsa_out <- npsa_surv(time, event, treat, confounders,
 # Expected:
 # fit.times  = automatic, about 50 representative times
 # eval.times = automatic, about 200 internal times
-# plot.times = all fit.times
+# report.times = all fit.times
 # rv.times   = about 5 representative fit.times
 ```
 
 ```r
-# 2. User specifies analysis, plot, and RV times
+# 2. User specifies analysis, report, and RV times
 my_fit_times <- seq(0.1, 1.2, by = 0.1)
-my_plot_times <- c(0.2, 0.6, 1.0)
+my_report_times <- c(0.2, 0.6, 1.0)
 my_rv_times <- c(0.2, 0.6, 1.0)
 
 time.out <- npsa_times(time, event,
                        fit.times = my_fit_times,
-                       plot.times = my_plot_times,
+                       report.times = my_report_times,
                        rv.times = my_rv_times)
 
 np_out <- np_surv(time, event, treat, confounders,
                   fit.times = my_fit_times,
-                  np.options = list(plot.times = my_plot_times))
+                  np.options = list(report.times = my_report_times))
 npsa_out <- npsa_surv(time, event, treat, confounders,
                       fit.times = my_fit_times,
                       result = np_out$result,
-                      bound.options = list(plot.times = my_plot_times),
+                      bound.options = list(report.times = my_report_times),
                       rv.options = list(rv.times = my_rv_times))
 
 # Expected:
 # fit.times  = seq(0.1, 1.2, by = 0.1)
 # eval.times = automatic, covers 0 to 1.2
-# plot.times = c(0.2, 0.6, 1.0)
+# report.times = c(0.2, 0.6, 1.0)
 # rv.times   = c(0.2, 0.6, 1.0)
 ```
 
@@ -105,11 +105,11 @@ npsa_out <- npsa_surv(time, event, treat, confounders,
 # Expected:
 # fit.times  = c(0.2, 0.4, 0.6, 0.8)
 # eval.times = automatic, covers 0 to 0.8
-# plot.times = c(0.2, 0.4, 0.6, 0.8)
+# report.times = c(0.2, 0.4, 0.6, 0.8)
 # rv.times   = c(0.2, 0.4, 0.6, 0.8)
 ```
 
-In general, choose `fit.times` first. Then choose `plot.times` and
+In general, choose `fit.times` first. Then choose `report.times` and
 `rv.times` from `fit.times`.
 
 ## Codes Structure

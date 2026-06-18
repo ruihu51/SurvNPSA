@@ -5,7 +5,7 @@
 \title{Options for \code{np_surv()}}
 \usage{
 np_surv.options(
-  plot.times = NULL,
+  report.times = NULL,
   conf.band = TRUE,
   conf.level = 0.95,
   contrasts = c("surv.diff", "surv.ratio", "risk.ratio", "nnt"),
@@ -16,7 +16,7 @@ np_surv.options(
 )
 }
 \arguments{
-\item{plot.times}{Optional numeric vector of times to summarize and plot.
+\item{report.times}{Optional numeric vector of times to summarize and report.
 If \code{NULL}, all fitted times are used.}
 
 \item{conf.band}{Logical; if TRUE, compute uniform confidence bands.}

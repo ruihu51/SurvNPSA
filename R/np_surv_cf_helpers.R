@@ -522,9 +522,9 @@
                reject.no.effect = pvalue < 1 - conf.level)
 }
 
-.np_ci_summary <- function(surv.diff.df, plot.times) {
+.np_ci_summary <- function(surv.diff.df, report.times) {
     if ("times" %in% names(surv.diff.df)) {
-        idx <- sapply(plot.times, function(x) which.min(abs(surv.diff.df$times - x)))
+        idx <- sapply(report.times, function(x) which.min(abs(surv.diff.df$times - x)))
         idx <- unique(idx)
         if ("ptwise.trans.lower" %in% names(surv.diff.df)) {
             out <- data.frame(time = surv.diff.df$times[idx],
@@ -546,7 +546,7 @@
         return(out)
     }
 
-    idx <- sapply(plot.times, function(x) which.min(abs(surv.diff.df$time - x)))
+    idx <- sapply(report.times, function(x) which.min(abs(surv.diff.df$time - x)))
     idx <- unique(idx)
     out <- surv.diff.df[idx, c("time", "surv.diff", "ptwise.lower", "ptwise.upper", "ptwise.pval")]
     out$ci.includes.0 <- out$ptwise.lower <= 0 & out$ptwise.upper >= 0
