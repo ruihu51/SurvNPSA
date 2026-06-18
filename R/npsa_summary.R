@@ -328,7 +328,7 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
 #' @method summary interpretRV
 summary.interpretRV <- function(object, ...) {
     cat(object$title, "\n\n")
-    print(object$table)
+    print(as.data.frame(object$table), row.names = FALSE)
     invisible(object)
 }
 
