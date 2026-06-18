@@ -6,7 +6,8 @@
 #' @keywords internal
 .report.RV <- function(rv.times, result, rho = 1, theta = 0,
                        conf.level = .95, transform = FALSE,
-                       verbose = FALSE, unif = TRUE, t.lower, t.upper) {
+                       verbose = FALSE, unif = TRUE, t.lower, t.upper,
+                       uniform.test.sp0 = NULL) {
   res.list <- list()
 
   if (any(rv.times > max(result$fit.times))) {
@@ -59,9 +60,11 @@
       rho = rho,
       theta = theta,
       conf.level = conf.level,
-      verbose = verbose
+      verbose = verbose,
+      uniform.test.sp0 = uniform.test.sp0
     )
-    out$unif.RV <- unif.RV
+    out$unif.RV <- unif.RV$uniform.RV
+    out$uniform.test.sp0 <- unif.RV$uniform.test.sp0
     out$unif.idx <- unif.idx
   }
 
@@ -471,8 +474,16 @@ summary.interpretRV <- function(object, ...) {
         t.upper <- NA
     }
 
+    p.value.sp0 <- reject.sp0 <- NA
+    if (!is.null(res.RV$uniform.test.sp0)) {
+        p.value.sp0 <- res.RV$uniform.test.sp0$p.value[1]
+        reject.sp0 <- res.RV$uniform.test.sp0$reject.no.effect[1]
+    }
+
     out <- data.frame(t.lower = t.lower,
                       t.upper = t.upper,
+                      p.value.sp0 = p.value.sp0,
+                      reject.sp0 = reject.sp0,
                       URV = res.RV$unif.RV,
                       sp.URV = .npsa_sp_from_rv(res.RV$unif.RV),
                       window.source = if (is.null(res.RV$uniform.window.source)) NA else res.RV$uniform.window.source)
@@ -579,8 +590,8 @@ summary.interpretRV <- function(object, ...) {
 #'
 #' @param object An object returned by \code{\link{npsa_surv}()}.
 #' @param type Which summary to print. Options are \code{"overview"},
-#'   \code{"bounds"}, \code{"senspar"}, \code{"rv"}, \code{"rmst"}, and
-#'   \code{"all"}.
+#'   \code{"bounds"}, \code{"senspar"}, \code{"rv"}, \code{"urv"},
+#'   \code{"rmst"}, and \code{"all"}.
 #' @param digits Number of digits for printing.
 #' @param ... Additional arguments.
 #'
@@ -590,7 +601,7 @@ summary.interpretRV <- function(object, ...) {
 #' @export
 #' @method summary npsa_surv
 summary.npsa_surv <- function(object,
-                              type = c("overview", "bounds", "senspar", "rv", "rmst", "all"),
+                              type = c("overview", "bounds", "senspar", "rv", "urv", "rmst", "all"),
                               digits = 3, ...) {
     type <- match.arg(type)
 
@@ -641,6 +652,7 @@ summary.npsa_surv <- function(object,
     } else if (type == "rv") {
         .npsa_print_summary_table("RV and MIRV", tables$rv,
                                   digits, max.rows, "object$summary.tables$rv")
+    } else if (type == "urv") {
         .npsa_print_summary_table("Uniform RV", tables$urv,
                                   digits, max.rows, "object$summary.tables$urv")
     } else if (type == "rmst") {
@@ -757,8 +769,8 @@ summary.npsa_surv <- function(object,
 #' @param object An object returned by \code{\link{np_surv}()}.
 #' @param type Which summary to print. Options are \code{"surv.diff"},
 #'   \code{"surv"}, \code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"},
-#'   \code{"rmst"}, and \code{"all"}. If \code{NULL}, the summary keeps the
-#'   original default behavior.
+#'   \code{"uniform.test"}, \code{"rmst"}, and \code{"all"}. If \code{NULL},
+#'   the summary keeps the original default behavior.
 #' @param digits Number of digits for printing.
 #' @param ... Additional arguments.
 #'
@@ -775,7 +787,8 @@ summary.npSurv <- function(object, type = NULL, digits = 3, ...) {
     }
     if (!is.null(type)) {
         type <- match.arg(type, c("surv.diff", "surv", "surv.ratio",
-                                  "risk.ratio", "nnt", "rmst", "all"))
+                                  "risk.ratio", "nnt", "uniform.test",
+                                  "rmst", "all"))
     }
 
     tables <- object$summary.tables
@@ -784,18 +797,24 @@ summary.npSurv <- function(object, type = NULL, digits = 3, ...) {
     cat("No-Unobserved-Confounding Survival Report\n")
     cat("-----------------------------------------\n")
 
-    print.surv.diff <- function() {
+    print.surv.diff <- function(include.uniform = FALSE) {
         .npsa_print_summary_table("Survival difference summary",
                                   tables$surv.diff, digits, Inf,
                                   "object$summary.tables$surv.diff")
+        if (include.uniform) print.uniform.test()
+    }
+
+    print.uniform.test <- function() {
         if (!is.null(object$uniform.test)) {
             .npsa_print_summary_table("Uniform no-effect test",
                                       object$uniform.test, digits, Inf)
+        } else {
+            cat("\nUniform no-effect test is not available.\n")
         }
     }
 
     if (is.null(type)) {
-        print.surv.diff()
+        print.surv.diff(include.uniform = TRUE)
         if (!is.null(tables$rmst)) {
             .npsa_print_summary_table("RMST difference summary",
                                       tables$rmst, digits, Inf,
@@ -819,6 +838,8 @@ summary.npSurv <- function(object, type = NULL, digits = 3, ...) {
         .npsa_print_summary_table("Number needed to treat summary",
                                   tables$nnt, digits, Inf,
                                   "object$summary.tables$nnt")
+    } else if (type == "uniform.test") {
+        print.uniform.test()
     } else if (type == "rmst") {
         if (is.null(tables$rmst)) {
             cat("\nRMST summary is not available. Run `np_surv(..., rmst = TRUE)`.\n")
@@ -832,6 +853,7 @@ summary.npSurv <- function(object, type = NULL, digits = 3, ...) {
                                   tables$surv, digits, Inf,
                                   "object$summary.tables$surv")
         print.surv.diff()
+        print.uniform.test()
         .npsa_print_summary_table("Survival ratio summary",
                                   tables$surv.ratio, digits, Inf,
                                   "object$summary.tables$surv.ratio")

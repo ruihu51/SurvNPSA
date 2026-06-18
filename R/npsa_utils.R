@@ -646,6 +646,24 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE,
 }
 
 
+.uniform.no.effect.test <- function(theta.obs, IF.vals.theta.obs,
+                                    theta=0, conf.level=.95, seed=NULL){
+  if (!is.null(seed)) set.seed(seed)
+
+  n <- nrow(IF.vals.theta.obs)
+  epsilon <- .estimate.limit.dist(IF.vals = IF.vals.theta.obs)
+
+  test.stat <- n^(1/2)*max(abs(theta.obs - theta))
+  dist.null <- apply(epsilon, 1, function(x) {max(abs(x))})
+  pvalue <- mean(dist.null > test.stat)
+
+  out <- data.frame(theta=theta,
+                    test.stat=test.stat,
+                    p.value=pvalue,
+                    reject.no.effect=pvalue < 1-conf.level)
+  return(out)
+}
+
 ##############
 # testing
 ##############
@@ -665,28 +683,25 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE,
 .get.uniform.RV <- function(theta.obs, psi, tau,
                             IF.vals.theta.obs, IF.vals.psi, IF.vals.tau,
                             rho=1, theta=0, conf.level=.95, seed=6741,
-                            verbose=TRUE){
-  set.seed(seed)
+                            verbose=TRUE, uniform.test.sp0=NULL){
 
   # p-value under observed data
   # only proceed when p<0.05
   n <- nrow(IF.vals.theta.obs)
-  # test.stat <- n^(1/2)*sum(abs(theta.obs))
-  epsilon <- .estimate.limit.dist(IF.vals = IF.vals.theta.obs)
-  # dist.null <- apply(epsilon, 1, function(x) {max(abs(x))})
-  # dist.null <- rowSums(abs(epsilon)) # integration
-  # dist.null <- replicate(1e4, sum(abs(rbind(rt(n, df = n - 1)/sqrt(n)) %*% IF.vals.theta.obs)))
-
-
-  test.stat <- n^(1/2)*max(abs(theta.obs - theta))
-  dist.null <- apply(epsilon, 1, function(x) {max(abs(x))})
-
-  pvalue <- mean(dist.null > test.stat)
+  if (is.null(uniform.test.sp0)) {
+      uniform.test.sp0 <- .uniform.no.effect.test(theta.obs = theta.obs,
+                                                  IF.vals.theta.obs = IF.vals.theta.obs,
+                                                  theta = theta,
+                                                  conf.level = conf.level,
+                                                  seed = seed)
+  }
+  pvalue <- uniform.test.sp0$p.value[1]
   if (verbose) cat("The p-value under no unobserved confounding is:", pvalue, "\n")
 
-  if (pvalue < 1-conf.level) {
+  if (!is.na(pvalue) && pvalue < 1-conf.level) {
 
     if (verbose) message("Proceed to the test under unobserved confounding...")
+    if (!is.null(seed)) set.seed(seed)
     .get.pvalue.sens <- function(x){
       # IF function
       sens.all <- (x/sqrt(1-x))*abs(rho)
@@ -727,11 +742,13 @@ bounds2df <- function(bounds.conf.int, theta.obs, d=NULL, transform=TRUE,
       NA
     })
   } else {
-    if (verbose) message("The null hypothesis that the observed effect is zero cannot be rejected. Sensitivity analysis will not proceed.")
-    uniform.RV <- NA
+    if (verbose) message("The uniform no-effect test already does not reject at sp = 0; URV is set to 0.")
+    uniform.RV <- 0
   }
 
-  return(uniform.RV)
+  out <- list(uniform.RV = uniform.RV,
+              uniform.test.sp0 = uniform.test.sp0)
+  return(out)
 }
 
 .estimate.limit.dist.bound <- function(IF.vals.l, IF.vals.u,

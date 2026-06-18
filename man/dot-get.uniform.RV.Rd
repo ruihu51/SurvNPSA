@@ -15,7 +15,8 @@
   theta = 0,
   conf.level = 0.95,
   seed = 6741,
-  verbose = TRUE
+  verbose = TRUE,
+  uniform.test.sp0 = NULL
 )
 }
 \arguments{

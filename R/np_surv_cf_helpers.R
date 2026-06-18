@@ -488,7 +488,8 @@
 }
 
 .np_uniform_test <- function(result, time, event, uniform.cutpoint=c(0.01, 0.99),
-                             uniform.window=NULL, conf.level=.95, theta=0) {
+                             uniform.window=NULL, conf.level=.95, theta=0,
+                             seed=NULL) {
     surv.0 <- .np_get_surv_object(result, trt = 0, isotonize = TRUE)
     surv.1 <- .np_get_surv_object(result, trt = 1, isotonize = TRUE)
     if (is.null(uniform.window)) {
@@ -507,19 +508,16 @@
 
     theta.obs <- result$obs.comps.df$theta.obs[unif.idx]
     IF.vals.theta.obs <- result$IF.vals.theta.obs[,unif.idx, drop = FALSE]
-    n <- nrow(IF.vals.theta.obs)
-    epsilon <- .estimate.limit.dist(IF.vals = IF.vals.theta.obs)
-    test.stat <- sqrt(n) * max(abs(theta.obs - theta))
-    dist.null <- apply(epsilon, 1, function(x) max(abs(x)))
-    pvalue <- mean(dist.null > test.stat)
+    test.out <- .uniform.no.effect.test(theta.obs = theta.obs,
+                                        IF.vals.theta.obs = IF.vals.theta.obs,
+                                        theta = theta,
+                                        conf.level = conf.level,
+                                        seed = seed)
 
-    data.frame(t.lower = band.end.pts[1],
-               t.upper = band.end.pts[2],
-               n.time = length(unif.idx),
-               theta = theta,
-               test.stat = test.stat,
-               p.value = pvalue,
-               reject.no.effect = pvalue < 1 - conf.level)
+    cbind(data.frame(t.lower = band.end.pts[1],
+                     t.upper = band.end.pts[2],
+                     n.time = length(unif.idx)),
+          test.out)
 }
 
 .np_ci_summary <- function(surv.diff.df, report.times) {

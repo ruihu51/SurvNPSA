@@ -337,11 +337,21 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         if (verbose) cat("Start computing robustness values (RV):", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         t.lower <- urv.window[1]
         t.upper <- urv.window[2]
+        uniform.test.sp0 <- NULL
+        if (!is.null(result$uniform.test.sp0)) {
+            stored.test <- result$uniform.test.sp0
+            stored.window <- as.numeric(c(stored.test$t.lower[1], stored.test$t.upper[1]))
+            if (isTRUE(all.equal(stored.window, as.numeric(urv.window))) &&
+                isTRUE(all.equal(as.numeric(stored.test$theta[1]), as.numeric(theta)))) {
+                uniform.test.sp0 <- stored.test
+            }
+        }
 
         out$res.RV <- .report.RV(rv.times, result, rho = rho, theta = theta,
                                  transform = transform,
                                  verbose = verbose,
-                                 unif = TRUE, t.lower = t.lower, t.upper = t.upper)
+                                 unif = TRUE, t.lower = t.lower, t.upper = t.upper,
+                                 uniform.test.sp0 = uniform.test.sp0)
         out$res.RV$uniform.window <- urv.window
         out$res.RV$uniform.window.source <- urv.window.source
     }
@@ -539,7 +549,9 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     uniform.test <- .np_uniform_test(result, time, event,
                                     uniform.cutpoint = uniform.cutpoint,
                                     uniform.window = uniform.window,
-                                    conf.level = conf.level)
+                                    conf.level = conf.level,
+                                    seed = seed)
+    result$uniform.test.sp0 <- uniform.test
     time.info$uniform.window <- cf.out$band.end.pts
     time.info$uniform.window.source <- if (is.null(uniform.window)) "uniform.cutpoint" else "uniform.window"
     time.info$uniform.cutpoint <- uniform.cutpoint

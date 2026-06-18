@@ -11,8 +11,8 @@
 
 \item{type}{Which summary to print. Options are \code{"surv.diff"},
 \code{"surv"}, \code{"surv.ratio"}, \code{"risk.ratio"}, \code{"nnt"},
-\code{"rmst"}, and \code{"all"}. If \code{NULL}, the summary keeps the
-original default behavior.}
+\code{"uniform.test"}, \code{"rmst"}, and \code{"all"}. If \code{NULL},
+the summary keeps the original default behavior.}
 
 \item{digits}{Number of digits for printing.}
 
@@ -20,11 +20,9 @@ original default behavior.}
 }
 \value{
 Invisibly returns \code{object}.
+If \code{np_surv(rmst = TRUE)} was used, the summary also prints the RMST
+difference table.
 }
 \description{
 Summarize No-Unobserved-Confounding Survival Results
-}
-\details{
-If \code{np_surv(rmst = TRUE)} was used, the summary also prints the RMST
-difference table.
 }

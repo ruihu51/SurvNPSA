@@ -6,7 +6,7 @@
 \usage{
 \method{summary}{npsa_surv}(
   object,
-  type = c("overview", "bounds", "senspar", "rv", "rmst", "all"),
+  type = c("overview", "bounds", "senspar", "rv", "urv", "rmst", "all"),
   digits = 3,
   ...
 )
@@ -15,8 +15,8 @@
 \item{object}{An object returned by \code{\link{npsa_surv}()}.}
 
 \item{type}{Which summary to print. Options are \code{"overview"},
-\code{"bounds"}, \code{"senspar"}, \code{"rv"}, \code{"rmst"}, and
-\code{"all"}.}
+\code{"bounds"}, \code{"senspar"}, \code{"rv"}, \code{"urv"},
+\code{"rmst"}, and \code{"all"}.}
 
 \item{digits}{Number of digits for printing.}
 

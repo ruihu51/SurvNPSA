@@ -14,7 +14,8 @@
   verbose = FALSE,
   unif = TRUE,
   t.lower,
-  t.upper
+  t.upper,
+  uniform.test.sp0 = NULL
 )
 }
 \arguments{
