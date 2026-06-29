@@ -121,8 +121,8 @@
       V.a.vector <- mean((alpha.obs - alpha.drop)^2)
       if (verbose) cat(V.a.vector, "\n")
 
-      Gain.out.matrix = pmax(0, V.g.matrix.psi[eval.idx] / psi[fit.idx]) # 1*t
-      Gain.trt.vector = pmax(0, V.a.vector / result.sim.drop$tau) # 1*1
+      Gain.out.matrix = pmin(pmax(0, V.g.matrix.psi[eval.idx] / psi[fit.idx]), 1) # 1*t
+      Gain.trt.vector = pmin(pmax(0, V.a.vector / result.sim.drop$tau), 0.999) # 1*1
 
       if (verbose) cat(length(result.sim.drop$fit.times), "\n")
       Gain.out.df <- rbind(Gain.out.df, data.frame(C.Y.sq = Gain.out.matrix,
