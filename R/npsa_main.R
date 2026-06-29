@@ -206,6 +206,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         if (verbose) cat("Start simulating sensitivity parameters:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         senspar.df <- .simulate.senspar(time, event, treat, confounders,
                                         fit.times = result$fit.times,
+                                        eval.times = result$nuisance$eval.times,
                                         psi = result$obs.comps.df$psi,
                                         tau = result$tau,
                                         S.hat.obs = result$nuisance$event.pred,

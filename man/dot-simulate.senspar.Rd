@@ -10,6 +10,7 @@
   treat,
   confounders,
   fit.times,
+  eval.times = NULL,
   psi,
   tau,
   S.hat.obs,

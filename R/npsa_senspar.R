@@ -3,6 +3,7 @@
 #' @keywords internal
 .simulate.senspar <- function(time, event, treat, confounders,
                               fit.times,
+                              eval.times = NULL,
                               psi, tau, S.hat.obs, g.hat.obs,
                               num_drop = NULL, pct_drop = NULL, rep = 100, seed = 6741,
                               rmst = TRUE, fit.times.rmst = NULL, gamma = NULL, max_gap = NULL, tol=NULL,
@@ -81,6 +82,7 @@
                                             confounders = confounders.drop,
                                             fit.times = fit.times,
                                             nuisance.options = list(
+                                                eval.times = eval.times,
                                                 event.SL.library = list(c("survSL.gam.custom", "All")),
                                                 cens.SL.library = list(c("survSL.gam.custom", "All")),
                                                 prop.SL.library = list(c("SL.gam.custom", "All")),
