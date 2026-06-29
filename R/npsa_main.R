@@ -188,7 +188,12 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         }
         if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         if (is.null(result$rmst.obs)) {
-            eval.times.rmst <- result$fit.times
+            eval.times.rmst <- result$fit.times[result$fit.times <= max(fit.times.rmst)]
+            upper.rmst.idx <- which(result$fit.times >= max(fit.times.rmst))
+            if (length(upper.rmst.idx) > 0) {
+                eval.times.rmst <- sort(unique(c(eval.times.rmst, result$fit.times[min(upper.rmst.idx)])))
+            }
+            eval.times.rmst <- eval.times.rmst[eval.times.rmst <= max(result$nuisance$eval.times)]
             # cat(eval.times.rmst, "\n")
             result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
                                           max_gap, tol, tol1, tol2,
@@ -502,7 +507,12 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
         }
         if (verbose) cat("Start estimating RMST:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
         if (is.null(result$rmst.obs)) {
-            eval.times.rmst <- result$fit.times
+            eval.times.rmst <- result$fit.times[result$fit.times <= max(fit.times.rmst)]
+            upper.rmst.idx <- which(result$fit.times >= max(fit.times.rmst))
+            if (length(upper.rmst.idx) > 0) {
+                eval.times.rmst <- sort(unique(c(eval.times.rmst, result$fit.times[min(upper.rmst.idx)])))
+            }
+            eval.times.rmst <- eval.times.rmst[eval.times.rmst <= max(result$nuisance$eval.times)]
             result <- .get.rmst.obs.comps(time, event, result, fit.times.rmst, eval.times.rmst,
                                           max_gap, tol, tol1, tol2,
                                           gamma.type, verbose = verbose)

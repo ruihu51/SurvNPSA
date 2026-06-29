@@ -17,6 +17,14 @@ library(cubature)
         stop("No fit.times.rmst remain within the fitted time range.")
     }
 
+    if (length(eval.times.rmst) == 0) {
+        stop("No fitted time points remain within the RMST horizon.")
+    }
+
+    eval.idx <- sapply(eval.times.rmst, function(t0) min(which(result$fit.times >= t0)))
+    theta.obs.rmst <- result$obs.comps.df$theta.obs[eval.idx]
+    IF.vals.theta.obs.rmst <- result$IF.vals.theta.obs[, eval.idx, drop = FALSE]
+
     # cat("1", "\n")
     eval.times.rmst.check <- sort(eval.times.rmst[eval.times.rmst >= min(eval.times.rmst) & eval.times.rmst <= max(fit.times.rmst)])
     if (length(eval.times.rmst.check) > 1) {
@@ -34,9 +42,9 @@ library(cubature)
     }
 
     if(verbose) message("Estimating RMST differences...")
-    result$rmst.obs <- sapply(fit.times.rmst, .get.obs.rmst.int.vals, result$obs.comps.df$theta.obs, tol = tol, eval.times.rmst=eval.times.rmst)
+    result$rmst.obs <- sapply(fit.times.rmst, .get.obs.rmst.int.vals, theta.obs.rmst, tol = tol, eval.times.rmst=eval.times.rmst)
 
-    result$IF.vals.rmst.obs <- t(apply(result$IF.vals.theta.obs, 1, function(row) {
+    result$IF.vals.rmst.obs <- t(apply(IF.vals.theta.obs.rmst, 1, function(row) {
         sapply(fit.times.rmst, function(t) .get.obs.rmst.int.vals(t, row, tol = tol, eval.times.rmst=eval.times.rmst))
     }))
     if (length(fit.times.rmst) == 1) {
