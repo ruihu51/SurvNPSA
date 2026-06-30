@@ -25,6 +25,8 @@
   max_gap = NULL,
   tol = NULL,
   var_names = NULL,
+  drop.nuisance.options = list(),
+  alpha.trunc = 0.001,
   verbose = TRUE
 )
 }

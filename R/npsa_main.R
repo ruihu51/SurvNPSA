@@ -52,7 +52,10 @@
 #'   drop sizes \code{1} and \code{ceiling(0.5 * n_var)} when possible.
 #'   Use \code{senspar.save.path} to save generated sensitivity parameters to
 #'   a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
-#'   parameter simulation.
+#'   parameter simulation. Use \code{drop.nuisance.options} to control the
+#'   nuisance learners used only in the drop-variable sensitivity simulation.
+#'   Use \code{alpha.trunc} to truncate propensity scores only when computing
+#'   the treatment-side alpha benchmark.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.
@@ -129,6 +132,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     senspar.save.path <- sens.options$senspar.save.path
     sens.seed <- sens.options$seed
     senspar.only <- sens.options$senspar.only
+    drop.nuisance.options <- sens.options$drop.nuisance.options
+    alpha.trunc <- sens.options$alpha.trunc
 
     n_var <- ncol(confounders)
     if (is.null(var_names)) {
@@ -226,6 +231,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                         max_gap = if (rmst) max_gap else NULL,
                                         tol = if (rmst) tol else NULL,
                                         var_names = var_names,
+                                        drop.nuisance.options = drop.nuisance.options,
+                                        alpha.trunc = alpha.trunc,
                                         verbose = verbose)
         if (save || !is.null(senspar.save.path)) {
             if (is.null(senspar.save.path)) senspar.save.path <- "dev/senspar.df.RData"
@@ -730,7 +737,9 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
                               senspar.df = NULL, num_drop = NULL,
                               senspar.save.path = NULL,
                               seed = 6741,
-                              senspar.only = FALSE) {
+                              senspar.only = FALSE,
+                              drop.nuisance.options = list(),
+                              alpha.trunc = 0.001) {
     # Use either pct_drop or num_drop. The simulation also adds d = 1 and
     # d = ceiling(0.5 * n_var) as benchmark drop sizes when possible.
     # If num_drop is supplied by itself, use exact drop sizes instead of the default pct_drop.
@@ -747,8 +756,18 @@ npsa_sens.options <- function(pct_drop = c(0.3, 0.7), rep = 10,
     if (length(senspar.only) != 1 || !is.logical(senspar.only) || is.na(senspar.only)) {
         stop("'senspar.only' must be TRUE or FALSE.")
     }
+    if (!is.list(drop.nuisance.options)) {
+        stop("'drop.nuisance.options' must be a list.")
+    }
+    if (!is.null(alpha.trunc) &&
+        (length(alpha.trunc) != 1 || !is.numeric(alpha.trunc) ||
+         !is.finite(alpha.trunc) || alpha.trunc <= 0 || alpha.trunc >= 0.5)) {
+        stop("'alpha.trunc' must be NULL or one number between 0 and 0.5.")
+    }
 
     list(pct_drop = pct_drop, rep = rep, senspar.df = senspar.df,
          num_drop = num_drop, senspar.save.path = senspar.save.path,
-         seed = seed, senspar.only = senspar.only)
+         seed = seed, senspar.only = senspar.only,
+         drop.nuisance.options = drop.nuisance.options,
+         alpha.trunc = alpha.trunc)
 }

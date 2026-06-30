@@ -70,7 +70,10 @@ for exact numbers of covariates to drop, but not both. The default uses
 drop sizes \code{1} and \code{ceiling(0.5 * n_var)} when possible.
 Use \code{senspar.save.path} to save generated sensitivity parameters to
 a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
-parameter simulation.}
+parameter simulation. Use \code{drop.nuisance.options} to control the
+nuisance learners used only in the drop-variable sensitivity simulation.
+Use \code{alpha.trunc} to truncate propensity scores only when computing
+the treatment-side alpha benchmark.}
 
 \item{result}{Optional precomputed result object (e.g., containing nuisances).}
 

@@ -7,7 +7,8 @@
                               psi, tau, S.hat.obs, g.hat.obs,
                               num_drop = NULL, pct_drop = NULL, rep = 100, seed = 6741,
                               rmst = TRUE, fit.times.rmst = NULL, gamma = NULL, max_gap = NULL, tol=NULL,
-                              var_names = NULL, verbose = TRUE){
+                              var_names = NULL, drop.nuisance.options = list(),
+                              alpha.trunc = 0.001, verbose = TRUE){
 
   n_var <- ncol(confounders)
   if (is.null(var_names)) {
@@ -29,6 +30,35 @@
 
   if (length(fit.times) != length(psi)) {
     stop("The length of 'fit.times' must match the length of 'psi'.")
+  }
+  if (!is.list(drop.nuisance.options)) {
+    stop("'drop.nuisance.options' must be a list.")
+  }
+  if (!is.null(alpha.trunc) &&
+      (length(alpha.trunc) != 1 || !is.numeric(alpha.trunc) ||
+       !is.finite(alpha.trunc) || alpha.trunc <= 0 || alpha.trunc >= 0.5)) {
+    stop("'alpha.trunc' must be NULL or one number between 0 and 0.5.")
+  }
+
+  drop.nuisance <- list(
+      eval.times = eval.times,
+      event.SL.library = list(c("survSL.gam.custom", "All")),
+      cens.SL.library = list(c("survSL.gam.custom", "All")),
+      prop.SL.library = lapply(c("SL.glm", "SL.gam.custom"),
+                               function(alg) c(alg, "All")),
+      V = 5,
+      survSL.control = list(initWeightAlg = "survSL.gam.custom", verbose = FALSE),
+      survSL.cvControl = list(V = 5)
+  )
+  if (length(drop.nuisance.options) > 0) {
+      for (nm in names(drop.nuisance.options)) {
+          drop.nuisance[[nm]] <- drop.nuisance.options[[nm]]
+      }
+      drop.nuisance$eval.times <- eval.times
+  }
+  if (!is.null(alpha.trunc) && verbose) {
+      cat("Truncating propensity scores for sensitivity alpha calculation at",
+          alpha.trunc, "\n")
   }
 
   # if (rmst){
@@ -81,15 +111,7 @@
                                             treat = treat,
                                             confounders = confounders.drop,
                                             fit.times = fit.times,
-                                            nuisance.options = list(
-                                                eval.times = eval.times,
-                                                event.SL.library = list(c("survSL.gam.custom", "All")),
-                                                cens.SL.library = list(c("survSL.gam.custom", "All")),
-                                                prop.SL.library = list(c("SL.gam.custom", "All")),
-                                                V = 5,
-                                                survSL.control = list(initWeightAlg = "survSL.gam.custom", verbose = FALSE),
-                                                survSL.cvControl = list(V = 5)
-                                            ),
+                                            nuisance.options = drop.nuisance,
                                             verbose = FALSE)
       result.sim.drop <- .get.obs.comps(time=time, event=event, treat=treat,
                                         result=result.sim.drop,
@@ -110,8 +132,16 @@
 
       g.hat.obs.drop <- result.sim.drop$nuisance$prop.pred
 
-      alpha.drop <- (treat - g.hat.obs.drop)/(g.hat.obs.drop*(1 - g.hat.obs.drop))
-      alpha.obs <- (treat - g.hat.obs)/(g.hat.obs*(1 - g.hat.obs))
+      if (!is.null(alpha.trunc)) {
+          g.hat.obs.alpha <- pmin(pmax(g.hat.obs, alpha.trunc), 1 - alpha.trunc)
+          g.hat.obs.drop.alpha <- pmin(pmax(g.hat.obs.drop, alpha.trunc), 1 - alpha.trunc)
+      } else {
+          g.hat.obs.alpha <- g.hat.obs
+          g.hat.obs.drop.alpha <- g.hat.obs.drop
+      }
+
+      alpha.drop <- (treat - g.hat.obs.drop.alpha)/(g.hat.obs.drop.alpha*(1 - g.hat.obs.drop.alpha))
+      alpha.obs <- (treat - g.hat.obs.alpha)/(g.hat.obs.alpha*(1 - g.hat.obs.alpha))
 
 
       V.g.matrix.psi <- colMeans((S.hat.obs - S.hat.obs.drop)^2)
@@ -171,7 +201,9 @@
                rep = rep,
                pct_drop = pct_drop,
                num_drop = num_drop,
-               var_names = var_names)
+               var_names = var_names,
+               drop.nuisance.options = drop.nuisance,
+               alpha.trunc = alpha.trunc)
 
   senspar <- list(sens.df = sens.df,
                   sens.df.mean = sens.df.mean,
