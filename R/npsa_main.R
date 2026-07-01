@@ -54,8 +54,8 @@
 #'   a custom path. Use \code{senspar.only = TRUE} to stop after sensitivity
 #'   parameter simulation. Use \code{drop.nuisance.options} to control the
 #'   nuisance learners used only in the drop-variable sensitivity simulation.
-#'   Use \code{alpha.trunc} to truncate propensity scores only when computing
-#'   the treatment-side alpha benchmark.
+#'   Use \code{alpha.trunc} to truncate dropped-model propensity scores and the
+#'   full-model propensity scores used in the treatment-side alpha benchmark.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.

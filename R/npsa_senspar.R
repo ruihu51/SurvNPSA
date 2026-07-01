@@ -56,6 +56,11 @@
       }
       drop.nuisance$eval.times <- eval.times
   }
+  if (!is.null(alpha.trunc)) {
+      drop.nuisance$prop.trunc <- alpha.trunc
+  } else {
+      drop.nuisance$prop.trunc <- 0
+  }
   if (!is.null(alpha.trunc) && verbose) {
       cat("Truncating propensity scores for sensitivity alpha calculation at",
           alpha.trunc, "\n")
@@ -113,9 +118,10 @@
                                             fit.times = fit.times,
                                             nuisance.options = drop.nuisance,
                                             verbose = FALSE)
+      # Drop-model psi is computed because .get.obs.comps() requires psi.type, but it is not used below.
       result.sim.drop <- .get.obs.comps(time=time, event=event, treat=treat,
                                         result=result.sim.drop,
-                                        psi.type = "hybrid",
+                                        psi.type = "hybrid", tau.type = "plug.in",
                                         verbose = FALSE)
 
       eval.idx <- sapply(result.sim.drop$fit.times, function(ft) {
@@ -146,8 +152,6 @@
 
       V.g.matrix.psi <- colMeans((S.hat.obs - S.hat.obs.drop)^2)
 
-      V.a.vector <- tau - result.sim.drop$tau
-      if (verbose) cat(V.a.vector, "\n")
       V.a.vector <- mean((alpha.obs - alpha.drop)^2)
       if (verbose) cat(V.a.vector, "\n")
 
