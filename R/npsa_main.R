@@ -181,6 +181,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                  verbose = verbose)
         if (save) save(result, file = "dev/result.RData")
     }
+    # Clean old cached result objects; RMST gamma lives in result$gamma.est
+    # and result$IF.vals.gamma.
     if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
     time.info$fit.times <- result$fit.times
     time.info$eval.times <- result$nuisance$eval.times
@@ -533,6 +535,8 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                  verbose = verbose)
         if (save) save(result, file = "dev/result.RData")
     }
+    # Clean old cached result objects; RMST gamma lives in result$gamma.est
+    # and result$IF.vals.gamma.
     if (!is.null(result$obs.comps.df$gamma)) result$obs.comps.df$gamma <- NULL
     time.info$fit.times <- result$fit.times
     time.info$eval.times <- result$nuisance$eval.times
