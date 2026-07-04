@@ -18,6 +18,7 @@ npsa_surv(
   rmst.options = list(),
   sens.options = list(),
   result = NULL,
+  np.out = NULL,
   var_names = NULL,
   verbose = FALSE,
   save = FALSE
@@ -77,6 +78,9 @@ full-model propensity scores used in the treatment-side alpha benchmark.}
 
 \item{result}{Optional precomputed result object (e.g., containing nuisances).}
 
+\item{np.out}{Optional output from \code{\link{np_surv}()} to use as the
+no-unobserved-confounding baseline.}
+
 \item{var_names}{Character vector of confounder variable names.}
 
 \item{verbose}{Logical; if TRUE, print system timestamps for each estimation step.}
@@ -87,6 +91,7 @@ full-model propensity scores used in the treatment-side alpha benchmark.}
 A list of class \code{npsa_surv} containing:
 \describe{
 \item{result}{Estimated observable components and IFs, such as observed survival differences and rmst differences.}
+\item{np.out}{No-unobserved-confounding baseline output from \code{\link{np_surv}()}.}
 \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 \item{res.RV}{Robustness values at specified or default representative times.}
@@ -113,6 +118,9 @@ grid and is chosen automatically when omitted.
 Sensitivity bound curves are computed over \code{fit.times} for plotting.
 \code{bound.options$report.times} controls reported time summaries and the
 default \code{rv.options$rv.times} when RV/MIRV times are not supplied.
+The \code{d = 0} no-unobserved-confounding row in \code{bounds.df} is taken
+from \code{\link{np_surv}()}; sensitivity bounds are then added for
+\code{d > 0}.
 }
 \examples{
 # Simulate toy data and fit sensitivity bounds (see package vignettes for full examples)

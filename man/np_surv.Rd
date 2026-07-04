@@ -64,8 +64,9 @@ When \code{rmst = TRUE}, the returned object also includes
 Estimate the adjusted survival results under no unobserved confounding.
 This user-facing wrapper reuses the same nuisance and observed-component
 pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
-survival curves, the survival-difference \code{sp = 0} bounds dataframe,
-and common CFsurvival-style contrasts not defined by the sensitivity target.
+survival curves, the survival-difference \code{sp = 0} result with
+CFsurvival-style pointwise inference, and common CFsurvival-style contrasts
+not defined by the sensitivity target.
 }
 \details{
 If \code{fit.times} is not supplied, the function chooses a compact analysis

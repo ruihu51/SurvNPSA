@@ -16,6 +16,9 @@
 #' Sensitivity bound curves are computed over \code{fit.times} for plotting.
 #' \code{bound.options$report.times} controls reported time summaries and the
 #' default \code{rv.options$rv.times} when RV/MIRV times are not supplied.
+#' The \code{d = 0} no-unobserved-confounding row in \code{bounds.df} is taken
+#' from \code{\link{np_surv}()}; sensitivity bounds are then added for
+#' \code{d > 0}.
 #'
 #' @param time Numeric vector of event or censoring times.
 #' @param event Numeric vector of event indicators (1 = event, 0 = censored).
@@ -57,6 +60,8 @@
 #'   Use \code{alpha.trunc} to truncate dropped-model propensity scores and the
 #'   full-model propensity scores used in the treatment-side alpha benchmark.
 #' @param result Optional precomputed result object (e.g., containing nuisances).
+#' @param np.out Optional output from \code{\link{np_surv}()} to use as the
+#'   no-unobserved-confounding baseline.
 #' @param var_names Character vector of confounder variable names.
 #' @param verbose Logical; if TRUE, print system timestamps for each estimation step.
 #' @param save Logical; if TRUE, save intermediate results.
@@ -64,6 +69,7 @@
 #' @return A list of class \code{npsa_surv} containing:
 #' \describe{
 #'   \item{result}{Estimated observable components and IFs, such as observed survival differences and rmst differences.}
+#'   \item{np.out}{No-unobserved-confounding baseline output from \code{\link{np_surv}()}.}
 #'   \item{bounds.df}{Estimated bounds on survival contrasts over time.}
 #'   \item{senspar.df}{Simulated sensitivity parameters based on observed data.}
 #'   \item{res.RV}{Robustness values at specified or default representative times.}
@@ -95,6 +101,7 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
                       rmst.options = list(),
                       sens.options = list(),
                       result = NULL,
+                      np.out = NULL,
                       var_names = NULL,
                       verbose = FALSE,
                       save = FALSE) {
@@ -134,6 +141,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     senspar.only <- sens.options$senspar.only
     drop.nuisance.options <- sens.options$drop.nuisance.options
     alpha.trunc <- sens.options$alpha.trunc
+
+    if (!is.null(np.out) && is.null(result)) result <- np.out$result
 
     n_var <- ncol(confounders)
     if (is.null(var_names)) {
@@ -317,10 +326,39 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
         urv.window.source <- "rv.options$uniform.cutpoint"
     }
 
-    # Observed bounds
-    if (verbose) cat("Start computing observed bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
-    bounds.df <- .report.bounds(bound.times, result, rho = rho, rmst = rmst, transform = transform,
-                                scale = scale, band.end.pts = uniform.window)
+    # No-unobserved-confounding baseline
+    if (is.null(np.out)) {
+        if (verbose) cat("Start computing no-unobserved-confounding baseline:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+        np.out <- np_surv(time = time,
+                          event = event,
+                          treat = treat,
+                          confounders = confounders,
+                          fit.times = result$fit.times,
+                          nuisance.options = nuisance.options,
+                          np.options = list(report.times = report.times,
+                                            conf.band = TRUE,
+                                            contrasts = "surv.diff",
+                                            uniform.cutpoint = uniform.cutpoint,
+                                            uniform.window = uniform.window),
+                          rmst = rmst,
+                          rmst.options = rmst.options,
+                          result = result,
+                          var_names = var_names,
+                          verbose = FALSE,
+                          save = FALSE)
+    }
+    if (is.null(np.out$surv.diff.df)) {
+        stop("`np.out` must contain `surv.diff.df`.")
+    }
+    if (rmst && is.null(np.out$rmst.diff.df)) {
+        stop("`np.out` must include RMST results when `rmst = TRUE`.")
+    }
+    if (!is.null(np.out$result)) result <- np.out$result
+
+    bounds.df <- list(bounds.df = .np_surv_diff_to_boundsdf(np.out$surv.diff.df,
+                                                            transform = transform),
+                      bounds.df.rmst = NULL)
+    if (rmst) bounds.df$bounds.df.rmst <- np.out$rmst.diff.df
 
     # Bounds under sensitivity
     if (verbose) cat("Start computing sensitivity bounds:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -345,7 +383,8 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
     #     plot(bounds.df$bounds.df)
     # }
 
-    out <- list(result = result, senspar.df = senspar.df, bounds.df = bounds.df,
+    out <- list(result = result, np.out = np.out,
+                senspar.df = senspar.df, bounds.df = bounds.df,
                 var_names = var_names, time.info = time.info)
 
     # Robustness Values computations
@@ -387,8 +426,9 @@ npsa_surv <- function(time, event, treat, confounders, fit.times = NULL,
 #' Estimate the adjusted survival results under no unobserved confounding.
 #' This user-facing wrapper reuses the same nuisance and observed-component
 #' pipeline used by \code{\link{npsa_surv}()}, then reports treatment-specific
-#' survival curves, the survival-difference \code{sp = 0} bounds dataframe,
-#' and common CFsurvival-style contrasts not defined by the sensitivity target.
+#' survival curves, the survival-difference \code{sp = 0} result with
+#' CFsurvival-style pointwise inference, and common CFsurvival-style contrasts
+#' not defined by the sensitivity target.
 #'
 #' If \code{fit.times} is not supplied, the function chooses a compact analysis
 #' grid from positive observed follow-up times before the largest observed event
@@ -535,7 +575,7 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
     time.info$report.times <- report.times
 
     # Treatment-specific survival and survival contrasts
-    cf.contrasts <- setdiff(contrasts, "surv.diff")
+    cf.contrasts <- contrasts
     cf.out <- .np_report_cf_surv(time, event, treat, result,
                                  conf.band = conf.band,
                                  conf.level = conf.level,
@@ -544,14 +584,6 @@ np_surv <- function(time, event, treat, confounders, fit.times = NULL,
                                  uniform.window = uniform.window,
                                  isotonize = isotonize)
 
-    # Survival difference is the zero-sensitivity special case of SurvNPSA.
-    surv.diff.out <- .report.bounds(result$fit.times, result,
-                                    rmst = FALSE,
-                                    transform = TRUE,
-                                    scale = TRUE,
-                                    band.end.pts = cf.out$band.end.pts,
-                                    conf.level = conf.level)
-    cf.out$surv.diff.df <- surv.diff.out$bounds.df
     rmst.diff.df <- NULL
     rmst.summary <- NULL
     if (rmst) {

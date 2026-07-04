@@ -559,3 +559,37 @@
     rownames(out) <- NULL
     return(out)
 }
+
+.np_surv_diff_to_boundsdf <- function(surv.diff.df, transform=TRUE) {
+    if (is.null(surv.diff.df) || nrow(surv.diff.df) == 0) return(data.frame())
+
+    if ("times" %in% names(surv.diff.df)) {
+        class(surv.diff.df) <- c("boundsdf", "data.frame")
+        return(surv.diff.df)
+    }
+
+    if (transform) {
+        bounds.df <- data.frame(times = surv.diff.df$time,
+                                d = 0,
+                                uniform.trans.lower = surv.diff.df$unif.lower,
+                                ptwise.trans.lower = surv.diff.df$ptwise.lower,
+                                effect.lower = surv.diff.df$surv.diff,
+                                theta.obs = surv.diff.df$surv.diff,
+                                effect.upper = surv.diff.df$surv.diff,
+                                ptwise.trans.upper = surv.diff.df$ptwise.upper,
+                                uniform.trans.upper = surv.diff.df$unif.upper)
+    } else {
+        bounds.df <- data.frame(times = surv.diff.df$time,
+                                d = 0,
+                                uniform.bounds.lower = surv.diff.df$unif.lower,
+                                ptwise.bounds.lower = surv.diff.df$ptwise.lower,
+                                effect.lower = surv.diff.df$surv.diff,
+                                theta.obs = surv.diff.df$surv.diff,
+                                effect.upper = surv.diff.df$surv.diff,
+                                ptwise.bounds.upper = surv.diff.df$ptwise.upper,
+                                uniform.bounds.upper = surv.diff.df$unif.upper)
+    }
+
+    class(bounds.df) <- c("boundsdf", "data.frame")
+    return(bounds.df)
+}
