@@ -77,21 +77,47 @@
   Gain.out.phi.df <- data.frame(value = numeric(), t = numeric(), j = integer(), d = integer())
   Gain.trt.df <- data.frame(value = numeric(), j = integer(), d = integer())
   drop.sets <- data.frame(j = integer(), d = integer(),
-                          drop.index = character(), drop.name = character())
+                          drop.index = character(), drop.name = character(),
+                          drop.method = character(),
+                          n.possible.drop.sets = numeric())
+  drop.method.df <- data.frame(d = integer(), J = integer(),
+                               drop.method = character(),
+                               n.possible.drop.sets = numeric())
 
   num_drop <- sort(unique(c(num_drop, 1, ceiling(0.5 * n_var))))
   num_drop <- num_drop[num_drop >= 1 & num_drop < n_var]
+  max.comb <- 100000
 
   for(d in num_drop){
+    n.comb <- choose(n_var, d)
     if (d==1){
         drop.index <- seq(1, n_var, by=1)
         J <- n_var
+        drop.method <- "all"
     } else {
-        comb.drop <- combn(n_var, d)
-        J <- ifelse(dim(comb.drop)[2] > rep, rep, dim(comb.drop)[2])
         set.seed(seed)
-        drop.index <- comb.drop[,sample(1:dim(comb.drop)[2], J, replace = FALSE)]
+        if (is.finite(n.comb) && n.comb <= max.comb) {
+            comb.drop <- combn(n_var, d)
+            J <- ifelse(dim(comb.drop)[2] > rep, rep, dim(comb.drop)[2])
+            drop.index <- comb.drop[,sample(1:dim(comb.drop)[2], J, replace = FALSE), drop = FALSE]
+            drop.method <- ifelse(dim(comb.drop)[2] > rep, "sampled", "all")
+        } else {
+            J <- rep
+            drop.index <- matrix(NA, nrow = d, ncol = J)
+            for (j in 1:J) {
+                drop.index[,j] <- sort(sample(seq_len(n_var), d, replace = FALSE))
+            }
+            drop.method <- "sampled"
+        }
     }
+    if (verbose && drop.method == "sampled") {
+        cat("d =", d, ": sampling", J, "drop sets from",
+            format(n.comb, scientific = FALSE), "possible sets.\n")
+    }
+    drop.method.df <- rbind(drop.method.df,
+                            data.frame(d = d, J = J,
+                                       drop.method = drop.method,
+                                       n.possible.drop.sets = n.comb))
 
 
     for (j in 1:J){
@@ -108,7 +134,9 @@
       drop.name.txt <- paste(var_names[drop.idx], collapse = ",")
       drop.sets <- rbind(drop.sets, data.frame(j = j, d = d,
                                                drop.index = drop.idx.txt,
-                                               drop.name = drop.name.txt))
+                                               drop.name = drop.name.txt,
+                                               drop.method = drop.method,
+                                               n.possible.drop.sets = n.comb))
       if (verbose) cat(drop.name.txt, "\n")
 
       result.sim.drop <- .get.nuisances.est(time = time,
@@ -206,6 +234,7 @@
                pct_drop = pct_drop,
                num_drop = num_drop,
                var_names = var_names,
+               drop.method.df = drop.method.df,
                drop.nuisance.options = drop.nuisance,
                alpha.trunc = alpha.trunc)
 
