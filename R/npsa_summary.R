@@ -188,11 +188,16 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
         pull(confounder)
     out.1 <- if (length(out.1) == 0) NULL else out.1
 
-    change.idx <- which(diff(sens.mean.t0$sig.point) == 1)
-    out.d <- if (length(change.idx) > 0) {
-        c(sens.mean.t0$d[change.idx], sens.mean.t0$d[change.idx + 1])
+    if (nrow(sens.mean.t0) > 0 && sens.mean.t0$sig.point[1]) {
+        out.d <- paste0("At or below d=", sens.mean.t0$d[1])
     } else {
-        NULL
+        change.idx <- which(diff(sens.mean.t0$sig.point) == 1)
+        out.d <- if (length(change.idx) > 0) {
+            paste0("d=", sens.mean.t0$d[change.idx[1]],
+                   " and d=", sens.mean.t0$d[change.idx[1] + 1])
+        } else {
+            "Not reached by tested d values"
+        }
     }
 
     out <- mean(
@@ -214,7 +219,7 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
         Method = c("Leave-one-out", "Leave-d-out", "Leave-half-out"),
         Interpretation = c(
             if (is.null(out.1)) "None" else paste(out.1, collapse = ", "),
-            if (is.null(out.d)) "None" else paste0("d=", paste(out.d, collapse = " and d=")),
+            out.d,
             if (is.null(out.half)) "None" else paste0(round((out.half) * 100, 1), "th percentile")
         )
     )
@@ -271,8 +276,17 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
         arrange(d) %>%
         mutate(sig.unif = sens.par > sp.unif)
 
-    change.idx <- which(diff(out.unif$sig.unif) == 1)
-    out.d <- if (length(change.idx) > 0) c(out.unif$d[change.idx], out.unif$d[change.idx + 1]) else NULL
+    if (nrow(out.unif) > 0 && out.unif$sig.unif[1]) {
+        out.d <- paste0("At or below d=", out.unif$d[1])
+    } else {
+        change.idx <- which(diff(out.unif$sig.unif) == 1)
+        out.d <- if (length(change.idx) > 0) {
+            paste0("d=", out.unif$d[change.idx[1]],
+                   " and d=", out.unif$d[change.idx[1] + 1])
+        } else {
+            "Not reached by tested d values"
+        }
+    }
 
     out <- mean(
         sens.df %>%
@@ -301,7 +315,7 @@ interpret.RV <- function(object, t0 = NULL, type = c("RV", "MIRV", "URV"),
         Method = c("Leave-one-out", "Leave-d-out", "Leave-half-out"),
         Interpretation = c(
             if (is.null(out.1)) "None" else paste(out.1, collapse = ", "),
-            if (is.null(out.d)) "None" else paste0("d=", paste(out.d, collapse = " and d=")),
+            out.d,
             if (is.null(out.half)) "None" else paste0(round((out.half) * 100, 1), "th percentile")
         )
     )
